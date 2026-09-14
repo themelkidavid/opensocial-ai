@@ -1,7 +1,7 @@
 """
 OpenSocial AI – Innovation Discovery Engine
 
-Version 4.3
+Version 4.4
 
 Combines:
 - a problem description
@@ -10,15 +10,18 @@ Combines:
 - observable patterns
 - evidence gap analysis
 - evidence conflict detection
+- evidence-grounded insight generation
 
 The engine remains model-independent and transparent.
 
 AI-assisted reasoning can be added later without changing
-the evidence, quality, pattern, conflict, or evidence-gap interfaces.
+the evidence, quality, pattern, conflict, evidence-gap,
+or insight interfaces.
 """
 
 from dataclasses import dataclass, asdict, field
 from typing import Dict, List, Optional
+
 
 try:
     from src.evidence import EvidenceItem
@@ -38,6 +41,10 @@ try:
         EvidenceConflictDetector,
         EvidenceConflict,
     )
+    from src.insight_generation import (
+        InsightGenerator,
+        InsightCandidate,
+    )
 except ModuleNotFoundError:
     from evidence import EvidenceItem
     from pattern_discovery import (
@@ -55,6 +62,10 @@ except ModuleNotFoundError:
     from evidence_conflict import (
         EvidenceConflictDetector,
         EvidenceConflict,
+    )
+    from insight_generation import (
+        InsightGenerator,
+        InsightCandidate,
     )
 
 
@@ -81,13 +92,16 @@ class InnovationReport:
     validation_questions: List[str]
 
     evidence_count: int = 0
-    evidence_profile: List[str] = field(default_factory=list)
-    evidence_gaps: List[str] = field(default_factory=list)
+    evidence_profile: List[str] = field(
+        default_factory=list
+    )
+    evidence_gaps: List[str] = field(
+        default_factory=list
+    )
 
     observed_patterns: List[ObservedPattern] = field(
         default_factory=list
     )
-
     evidence_gap_details: List[EvidenceGap] = field(
         default_factory=list
     )
@@ -97,6 +111,10 @@ class InnovationReport:
     )
 
     evidence_conflicts: List[EvidenceConflict] = field(
+        default_factory=list
+    )
+
+    insights: List[InsightCandidate] = field(
         default_factory=list
     )
 
@@ -130,6 +148,8 @@ class InnovationDiscoveryEngine:
            ↓
         Evidence Gap Analysis
            ↓
+        Insight Generation
+           ↓
         Innovation Report
     """
 
@@ -140,6 +160,7 @@ class InnovationDiscoveryEngine:
         self.evidence_gap_analysis = EvidenceGapAnalysis()
         self.evidence_quality_assessor = EvidenceQualityAssessor()
         self.evidence_conflict_detector = EvidenceConflictDetector()
+        self.insight_generator = InsightGenerator()
 
     def analyse(
         self,
@@ -149,21 +170,26 @@ class InnovationDiscoveryEngine:
         """
         Analyse a problem and optionally incorporate evidence.
 
-        Evidence is validated, quality-assessed, profiled, patterns
-        are discovered, potential conflicts are identified, and
-        evidence gaps are analysed before the innovation report
-        is created.
+        Evidence is validated, quality-assessed, profiled,
+        patterns are discovered, potential conflicts are
+        identified, evidence gaps are analysed, and
+        evidence-grounded insight candidates are generated
+        before the innovation report is created.
         """
 
         if not problem or not problem.strip():
-            raise ValueError("A problem description is required.")
+            raise ValueError(
+                "A problem description is required."
+            )
 
         problem = problem.strip()
         evidence = evidence or []
 
         self._validate_evidence(evidence)
 
-        evidence_profile = self._build_evidence_profile(evidence)
+        evidence_profile = self._build_evidence_profile(
+            evidence
+        )
 
         evidence_quality = [
             self.evidence_quality_assessor.assess(
@@ -183,14 +209,24 @@ class InnovationDiscoveryEngine:
             )
         )
 
-        evidence_gap_details = self.evidence_gap_analysis.discover(
-            evidence
+        evidence_gap_details = (
+            self.evidence_gap_analysis.discover(
+                evidence
+            )
         )
 
         evidence_gaps = [
             gap.description
             for gap in evidence_gap_details
         ]
+
+        insights = self.insight_generator.generate(
+            evidence=evidence,
+            patterns=observed_patterns,
+            conflicts=evidence_conflicts,
+            evidence_gaps=evidence_gaps,
+            evidence_quality=evidence_quality,
+        )
 
         reframed_problem = (
             f"Instead of assuming that '{problem}' has a single cause, "
@@ -317,6 +353,11 @@ class InnovationDiscoveryEngine:
                 ]
             )
 
+        if insights:
+            validation_questions.append(
+                "Which generated insights should be tested with affected communities before acting on them?"
+            )
+
         return InnovationReport(
             problem=problem,
             reframed_problem=reframed_problem,
@@ -331,6 +372,7 @@ class InnovationDiscoveryEngine:
             evidence_gap_details=evidence_gap_details,
             evidence_quality=evidence_quality,
             evidence_conflicts=evidence_conflicts,
+            insights=insights,
         )
 
     @staticmethod
@@ -378,7 +420,8 @@ class InnovationDiscoveryEngine:
             {
                 item.location.strip()
                 for item in evidence
-                if item.location and item.location.strip()
+                if item.location
+                and item.location.strip()
             }
         )
 
@@ -386,7 +429,8 @@ class InnovationDiscoveryEngine:
             {
                 item.population.strip()
                 for item in evidence
-                if item.population and item.population.strip()
+                if item.population
+                and item.population.strip()
             }
         )
 
@@ -394,7 +438,8 @@ class InnovationDiscoveryEngine:
             {
                 item.date.strip()
                 for item in evidence
-                if item.date and item.date.strip()
+                if item.date
+                and item.date.strip()
             }
         )
 
@@ -500,6 +545,21 @@ if __name__ == "__main__":
         print(
             f"  Investigate: "
             f"{gap.investigation_question}"
+        )
+
+    print("\nGenerated Insights:")
+    for insight in report.insights:
+        print(
+            f"- {insight.title}"
+        )
+        print(
+            f"  Insight: {insight.insight}"
+        )
+        print(
+            f"  Confidence: {insight.confidence}"
+        )
+        print(
+            f"  Investigate: {insight.investigation_question}"
         )
 
     print("\nSolution Hypotheses:")
