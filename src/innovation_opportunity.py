@@ -26,6 +26,7 @@ Potential opportunity types include:
 - transfer_opportunity
 """
 
+
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 
@@ -314,7 +315,7 @@ class InnovationOpportunityDetector:
                         "conflicting outcomes"
                     ),
                     description=(
-                        "Different evidence sources report "
+                        "Conflicting evidence sources report "
                         "different outcomes. This contradiction "
                         "may reveal that an intervention works "
                         "under some conditions but not others."
