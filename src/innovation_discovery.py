@@ -1,18 +1,19 @@
 """
 OpenSocial AI – Innovation Discovery Engine
 
-Version 4.1
+Version 4.2
 
 Combines:
 - a problem description
 - structured evidence
+- evidence quality assessment
 - observable patterns
 - evidence gap analysis
 
 The engine remains model-independent and transparent.
 
 AI-assisted reasoning can be added later without changing
-the evidence, pattern, or evidence-gap interfaces.
+the evidence, quality, pattern, or evidence-gap interfaces.
 """
 
 from dataclasses import dataclass, asdict, field
@@ -28,6 +29,10 @@ try:
         EvidenceGapAnalysis,
         EvidenceGap,
     )
+    from src.evidence_quality import (
+        EvidenceQualityAssessor,
+        EvidenceQuality,
+    )
 except ModuleNotFoundError:
     from evidence import EvidenceItem
     from pattern_discovery import (
@@ -37,6 +42,10 @@ except ModuleNotFoundError:
     from evidence_gap import (
         EvidenceGapAnalysis,
         EvidenceGap,
+    )
+    from evidence_quality import (
+        EvidenceQualityAssessor,
+        EvidenceQuality,
     )
 
 
@@ -74,6 +83,10 @@ class InnovationReport:
         default_factory=list
     )
 
+    evidence_quality: List[EvidenceQuality] = field(
+        default_factory=list
+    )
+
     def to_dict(self) -> Dict:
         """Return the complete report as a dictionary."""
 
@@ -96,6 +109,8 @@ class InnovationDiscoveryEngine:
 
         Evidence
            ↓
+        Evidence Quality
+           ↓
         Pattern Discovery
            ↓
         Evidence Gap Analysis
@@ -108,6 +123,7 @@ class InnovationDiscoveryEngine:
 
         self.pattern_discovery = PatternDiscovery()
         self.evidence_gap_analysis = EvidenceGapAnalysis()
+        self.evidence_quality_assessor = EvidenceQualityAssessor()
 
     def analyse(
         self,
@@ -117,8 +133,9 @@ class InnovationDiscoveryEngine:
         """
         Analyse a problem and optionally incorporate evidence.
 
-        Evidence is profiled, patterns are discovered, and evidence
-        gaps are identified before the innovation report is created.
+        Evidence is validated, quality-assessed, profiled, patterns
+        are discovered, and evidence gaps are identified before the
+        innovation report is created.
         """
 
         if not problem or not problem.strip():
@@ -130,6 +147,14 @@ class InnovationDiscoveryEngine:
         self._validate_evidence(evidence)
 
         evidence_profile = self._build_evidence_profile(evidence)
+
+        evidence_quality = [
+            self.evidence_quality_assessor.assess(
+                item,
+                all_evidence=evidence,
+            )
+            for item in evidence
+        ]
 
         observed_patterns = self.pattern_discovery.discover(
             evidence
@@ -168,6 +193,7 @@ class InnovationDiscoveryEngine:
                     "Which observed patterns deserve further investigation?",
                     "Which evidence gaps are most important to address first?",
                     "What important information is still absent from the available evidence?",
+                    "Which evidence items have the strongest quality signals?",
                 ]
             )
         else:
@@ -270,6 +296,7 @@ class InnovationDiscoveryEngine:
             evidence_gaps=evidence_gaps,
             observed_patterns=observed_patterns,
             evidence_gap_details=evidence_gap_details,
+            evidence_quality=evidence_quality,
         )
 
     @staticmethod
@@ -408,6 +435,13 @@ if __name__ == "__main__":
     for item in report.evidence_profile:
         print("-", item)
 
+    print("\nEvidence Quality:")
+    for quality in report.evidence_quality:
+        print(
+            f"- Score: {quality.score} "
+            f"| Confidence: {quality.confidence}"
+        )
+
     print("\nObserved Patterns:")
     for pattern in report.observed_patterns:
         print(
@@ -429,4 +463,3 @@ if __name__ == "__main__":
     print("\nSolution Hypotheses:")
     for hypothesis in report.solution_hypotheses:
         print("-", hypothesis.title)
-        
