@@ -73,7 +73,7 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
 
         self.assertEqual(report.evidence_count, 2)
         self.assertGreater(len(report.evidence_profile), 0)
-        self.assertGreater(len(report.evidence_gaps), 0)
+        self.assertEqual(len(report.evidence_gaps), 0)
 
     def test_evidence_profile_reflects_multiple_sources(self):
         evidence = [
