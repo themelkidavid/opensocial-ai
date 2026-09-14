@@ -1,7 +1,7 @@
 """
 OpenSocial AI – Innovation Discovery Engine
 
-Version 4.2
+Version 4.3
 
 Combines:
 - a problem description
@@ -9,11 +9,12 @@ Combines:
 - evidence quality assessment
 - observable patterns
 - evidence gap analysis
+- evidence conflict detection
 
 The engine remains model-independent and transparent.
 
 AI-assisted reasoning can be added later without changing
-the evidence, quality, pattern, or evidence-gap interfaces.
+the evidence, quality, pattern, conflict, or evidence-gap interfaces.
 """
 
 from dataclasses import dataclass, asdict, field
@@ -33,6 +34,10 @@ try:
         EvidenceQualityAssessor,
         EvidenceQuality,
     )
+    from src.evidence_conflict import (
+        EvidenceConflictDetector,
+        EvidenceConflict,
+    )
 except ModuleNotFoundError:
     from evidence import EvidenceItem
     from pattern_discovery import (
@@ -46,6 +51,10 @@ except ModuleNotFoundError:
     from evidence_quality import (
         EvidenceQualityAssessor,
         EvidenceQuality,
+    )
+    from evidence_conflict import (
+        EvidenceConflictDetector,
+        EvidenceConflict,
     )
 
 
@@ -87,6 +96,10 @@ class InnovationReport:
         default_factory=list
     )
 
+    evidence_conflicts: List[EvidenceConflict] = field(
+        default_factory=list
+    )
+
     def to_dict(self) -> Dict:
         """Return the complete report as a dictionary."""
 
@@ -113,6 +126,8 @@ class InnovationDiscoveryEngine:
            ↓
         Pattern Discovery
            ↓
+        Conflict Detection
+           ↓
         Evidence Gap Analysis
            ↓
         Innovation Report
@@ -124,6 +139,7 @@ class InnovationDiscoveryEngine:
         self.pattern_discovery = PatternDiscovery()
         self.evidence_gap_analysis = EvidenceGapAnalysis()
         self.evidence_quality_assessor = EvidenceQualityAssessor()
+        self.evidence_conflict_detector = EvidenceConflictDetector()
 
     def analyse(
         self,
@@ -134,8 +150,9 @@ class InnovationDiscoveryEngine:
         Analyse a problem and optionally incorporate evidence.
 
         Evidence is validated, quality-assessed, profiled, patterns
-        are discovered, and evidence gaps are identified before the
-        innovation report is created.
+        are discovered, potential conflicts are identified, and
+        evidence gaps are analysed before the innovation report
+        is created.
         """
 
         if not problem or not problem.strip():
@@ -158,6 +175,12 @@ class InnovationDiscoveryEngine:
 
         observed_patterns = self.pattern_discovery.discover(
             evidence
+        )
+
+        evidence_conflicts = (
+            self.evidence_conflict_detector.discover(
+                evidence
+            )
         )
 
         evidence_gap_details = self.evidence_gap_analysis.discover(
@@ -194,6 +217,7 @@ class InnovationDiscoveryEngine:
                     "Which evidence gaps are most important to address first?",
                     "What important information is still absent from the available evidence?",
                     "Which evidence items have the strongest quality signals?",
+                    "Why do any conflicting evidence sources report different outcomes?",
                 ]
             )
         else:
@@ -284,6 +308,15 @@ class InnovationDiscoveryEngine:
             "What would need to be true before scaling the intervention?",
         ]
 
+        if evidence_conflicts:
+            validation_questions.extend(
+                [
+                    "What explains the disagreement between the conflicting evidence sources?",
+                    "Are the conflicting sources measuring the same outcome in the same way?",
+                    "Do differences in location, population or timeframe explain the conflict?",
+                ]
+            )
+
         return InnovationReport(
             problem=problem,
             reframed_problem=reframed_problem,
@@ -297,6 +330,7 @@ class InnovationDiscoveryEngine:
             observed_patterns=observed_patterns,
             evidence_gap_details=evidence_gap_details,
             evidence_quality=evidence_quality,
+            evidence_conflicts=evidence_conflicts,
         )
 
     @staticmethod
@@ -414,8 +448,8 @@ if __name__ == "__main__":
         EvidenceItem(
             source_type="community_feedback",
             content=(
-                "Young people reported improved access and "
-                "increased engagement after peer support."
+                "Young people reported that service uptake "
+                "decreased after peer support."
             ),
             date="2025-09-15",
             location="Madurai",
@@ -447,6 +481,14 @@ if __name__ == "__main__":
         print(
             f"- [{pattern.pattern_type}] "
             f"{pattern.description}"
+        )
+
+    print("\nEvidence Conflicts:")
+    for conflict in report.evidence_conflicts:
+        print("-", conflict.description)
+        print(
+            f"  Investigate: "
+            f"{conflict.investigation_question}"
         )
 
     print("\nEvidence Gaps:")
