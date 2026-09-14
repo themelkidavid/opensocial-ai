@@ -155,7 +155,7 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
         gaps_text = " ".join(report.evidence_gaps)
 
         self.assertIn("location information", gaps_text)
-        self.assertIn("population information", gaps_text)
+        self.assertIn("populations represented", gaps_text)
         self.assertIn("dates", gaps_text)
 
     def test_report_can_be_converted_to_dict(self):
