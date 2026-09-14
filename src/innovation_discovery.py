@@ -1,18 +1,37 @@
 """
-OpenSocial AI - Innovation Discovery Engine
-Version 1.0
+OpenSocial AI – Innovation Discovery Engine
 
-A model-independent framework for analysing social-sector problems
-and generating structured, testable solution hypotheses.
+Version 2
+
+The engine combines a problem description with structured evidence.
+
+The evidence-aware layer is intentionally deterministic and transparent.
+It does not claim to discover complex patterns from documents yet.
+
+Its purpose is to establish a reliable interface between the
+Evidence Layer and the Innovation Discovery Engine.
+
+Future versions can add:
+- pattern discovery
+- statistical analysis
+- document analysis
+- AI-assisted reasoning
+- cross-source synthesis
+- solution generation based on evidence
 """
 
-from dataclasses import dataclass, asdict
-from typing import List, Dict
+from dataclasses import dataclass, asdict, field
+from typing import Dict, List, Optional
+
+try:
+    from src.evidence import EvidenceItem
+except ModuleNotFoundError:
+    from evidence import EvidenceItem
 
 
 @dataclass
 class SolutionHypothesis:
-    """A potential solution that requires human validation."""
+    """A possible solution that can be tested through an experiment."""
 
     title: str
     rationale: str
@@ -23,7 +42,7 @@ class SolutionHypothesis:
 
 @dataclass
 class InnovationReport:
-    """Structured output from the Innovation Discovery Engine."""
+    """Structured output produced by the Innovation Discovery Engine."""
 
     problem: str
     reframed_problem: str
@@ -32,24 +51,57 @@ class InnovationReport:
     solution_hypotheses: List[SolutionHypothesis]
     validation_questions: List[str]
 
+    # Evidence-aware fields.
+    evidence_count: int = 0
+    evidence_profile: List[str] = field(default_factory=list)
+    evidence_gaps: List[str] = field(default_factory=list)
+
     def to_dict(self) -> Dict:
+        """Return the complete report as a dictionary."""
+
         return asdict(self)
 
 
 class InnovationDiscoveryEngine:
     """
-    Core engine for structured social-sector innovation analysis.
+    Model-independent Innovation Discovery Engine.
 
-    This first version is deliberately model-independent.
-    An AI model can be connected later without changing the
-    overall reasoning structure.
+    The engine can operate in two modes:
+
+    1. Baseline mode:
+       analyse(problem)
+
+    2. Evidence-aware mode:
+       analyse(problem, evidence=[...])
+
+    Existing users of the engine can continue using the original
+    analyse(problem) interface.
     """
 
-    def analyse(self, problem: str) -> InnovationReport:
+    def analyse(
+        self,
+        problem: str,
+        evidence: Optional[List[EvidenceItem]] = None,
+    ) -> InnovationReport:
+        """
+        Analyse a problem and optionally incorporate structured evidence.
+
+        Evidence is currently used to build a transparent evidence profile
+        and identify important evidence gaps. Complex pattern discovery
+        will be added in a later version.
+        """
+
         if not problem or not problem.strip():
             raise ValueError("A problem description is required.")
 
         problem = problem.strip()
+        evidence = evidence or []
+
+        self._validate_evidence(evidence)
+
+        evidence_profile, evidence_gaps = self._build_evidence_profile(
+            evidence
+        )
 
         reframed_problem = (
             f"Instead of assuming that '{problem}' has a single cause, "
@@ -67,6 +119,19 @@ class InnovationDiscoveryEngine:
             "What information is still missing?",
         ]
 
+        if evidence:
+            key_questions.extend(
+                [
+                    "Which evidence items support or challenge the current explanation?",
+                    "Where do different evidence sources agree or disagree?",
+                    "What important information is still absent from the available evidence?",
+                ]
+            )
+        else:
+            key_questions.append(
+                "What evidence should be collected before testing a solution?"
+            )
+
         possible_root_causes = [
             "Access or geographic barriers",
             "Economic or resource constraints",
@@ -81,70 +146,73 @@ class InnovationDiscoveryEngine:
             SolutionHypothesis(
                 title="Redesign the user journey",
                 rationale=(
-                    "The problem may be caused partly by friction between "
-                    "initial engagement and successful completion."
+                    "The problem may be partly caused by unnecessary "
+                    "friction between the person and the service."
                 ),
                 assumptions=[
-                    "There are identifiable points where people disengage.",
-                    "Some of these barriers can be redesigned."
+                    "There are identifiable points where people drop out.",
+                    "Some barriers can be changed through service redesign.",
                 ],
                 risks=[
-                    "The assumed friction point may not be the real cause.",
-                    "A redesign could unintentionally exclude some users."
+                    "Redesign may address symptoms rather than deeper causes.",
+                    "Changes may unintentionally exclude some groups.",
                 ],
                 experiment=(
-                    "Map the current user journey, identify the largest "
-                    "drop-off point and test one targeted improvement."
+                    "Map the current user journey with community members, "
+                    "identify the largest friction points, and test one "
+                    "small redesign."
                 ),
             ),
             SolutionHypothesis(
                 title="Peer-led support",
                 rationale=(
-                    "People may respond differently when support comes "
-                    "from trusted peers rather than formal institutions."
+                    "People may respond differently when support comes from "
+                    "trusted peers with relevant lived experience."
                 ),
                 assumptions=[
-                    "Relevant peer networks exist.",
-                    "Participants value peer support."
+                    "Peers are trusted by the target population.",
+                    "Peer supporters can be trained and supported.",
                 ],
                 risks=[
-                    "Confidentiality risks must be controlled.",
-                    "Peer representatives may not reflect all groups."
+                    "Peer supporters may experience overload or burnout.",
+                    "Peer support may not reach people who are highly isolated.",
                 ],
                 experiment=(
-                    "Run a small, supervised peer-support pilot and "
-                    "compare engagement with the existing approach."
+                    "Recruit and train a small group of peer supporters "
+                    "and compare engagement with the existing approach."
                 ),
             ),
             SolutionHypothesis(
                 title="Flexible access model",
                 rationale=(
-                    "Timing, location or process requirements may prevent "
-                    "people from accessing services consistently."
+                    "Fixed service models may not fit the schedules, "
+                    "locations or circumstances of the people affected."
                 ),
                 assumptions=[
-                    "Access constraints materially affect participation.",
-                    "The organisation can modify selected service processes."
+                    "Access constraints contribute meaningfully to the problem.",
+                    "The organisation can test alternative access arrangements.",
                 ],
                 risks=[
-                    "Additional operational costs.",
-                    "Greater flexibility may require additional safeguards."
+                    "Flexible delivery may increase operational complexity.",
+                    "Demand may exceed the capacity of the new model.",
                 ],
                 experiment=(
-                    "Test one flexible access option in a limited setting "
-                    "and measure uptake, retention and user experience."
+                    "Test one alternative access option, such as extended "
+                    "hours, outreach, mobile delivery or digital support."
                 ),
             ),
         ]
 
         validation_questions = [
-            "Do affected communities recognise these barriers?",
-            "Which assumptions are supported by evidence?",
-            "Which proposed solution would people actually use?",
-            "Who could be unintentionally excluded?",
-            "What could cause each solution to fail?",
-            "What is the smallest safe experiment we can run?",
-            "What evidence would justify scaling the intervention?",
+            "Do community members recognise this problem and its causes?",
+            "What evidence supports each proposed explanation?",
+            "Do the proposed solutions address a meaningful barrier?",
+            "Would the intended users actually use the proposed solution?",
+            "Could the intervention unintentionally exclude anyone?",
+            "What is the smallest safe experiment that could test the idea?",
+            "What evidence would indicate that the experiment worked?",
+            "What evidence would indicate that the idea should be abandoned?",
+            "What would need to be true before scaling the intervention?",
         ]
 
         return InnovationReport(
@@ -154,7 +222,137 @@ class InnovationDiscoveryEngine:
             possible_root_causes=possible_root_causes,
             solution_hypotheses=solution_hypotheses,
             validation_questions=validation_questions,
+            evidence_count=len(evidence),
+            evidence_profile=evidence_profile,
+            evidence_gaps=evidence_gaps,
         )
+
+    @staticmethod
+    def _validate_evidence(evidence: List[EvidenceItem]) -> None:
+        """Validate evidence before it enters the analysis layer."""
+
+        for item in evidence:
+            if not isinstance(item, EvidenceItem):
+                raise TypeError(
+                    "All evidence items must be instances of EvidenceItem."
+                )
+
+            if not item.source_type.strip():
+                raise ValueError(
+                    "EvidenceItem source_type cannot be empty."
+                )
+
+            if not item.content.strip():
+                raise ValueError(
+                    "EvidenceItem content cannot be empty."
+                )
+
+    @staticmethod
+    def _build_evidence_profile(
+        evidence: List[EvidenceItem],
+    ) -> tuple[List[str], List[str]]:
+        """
+        Build a transparent summary of the available evidence.
+
+        This is deliberately descriptive rather than predictive.
+        """
+
+        if not evidence:
+            profile = [
+                "No evidence items supplied. The engine is operating in baseline mode."
+            ]
+
+            gaps = [
+                "No evidence has been supplied.",
+                "Historical change cannot be assessed without dated evidence.",
+                "Differences across locations cannot be assessed without location data.",
+                "Differences across populations cannot be assessed without population data.",
+            ]
+
+            return profile, gaps
+
+        source_types = sorted(
+            {
+                item.source_type.strip()
+                for item in evidence
+                if item.source_type.strip()
+            }
+        )
+
+        locations = sorted(
+            {
+                item.location.strip()
+                for item in evidence
+                if item.location and item.location.strip()
+            }
+        )
+
+        populations = sorted(
+            {
+                item.population.strip()
+                for item in evidence
+                if item.population and item.population.strip()
+            }
+        )
+
+        dates = sorted(
+            {
+                item.date.strip()
+                for item in evidence
+                if item.date and item.date.strip()
+            }
+        )
+
+        profile = [
+            f"{len(evidence)} evidence item(s) supplied.",
+            (
+                "Source types represented: "
+                + ", ".join(source_types)
+                + "."
+            ),
+        ]
+
+        gaps: List[str] = []
+
+        if len(source_types) > 1:
+            profile.append(
+                "Multiple evidence source types are represented, "
+                "enabling cross-source comparison."
+            )
+        else:
+            gaps.append(
+                "Only one evidence source type is represented; "
+                "cross-source comparison is limited."
+            )
+
+        if locations:
+            profile.append(
+                f"Locations represented: {', '.join(locations)}."
+            )
+        else:
+            gaps.append(
+                "No location information is available for the evidence."
+            )
+
+        if populations:
+            profile.append(
+                f"Populations represented: {', '.join(populations)}."
+            )
+        else:
+            gaps.append(
+                "No population information is available for the evidence."
+            )
+
+        if dates:
+            profile.append(
+                f"Dates represented: {', '.join(dates)}."
+            )
+        else:
+            gaps.append(
+                "No dates are available; change over time cannot yet be assessed."
+            )
+
+        return profile, gaps
 
 
 if __name__ == "__main__":
@@ -164,31 +362,28 @@ if __name__ == "__main__":
         "Young people are not consistently accessing an available service."
     )
 
-    print("\nOPEN SOCIAL AI")
-    print("Innovation Discovery Engine v1.0")
-    print("=" * 50)
-
-    print("\nPROBLEM")
+    print("Problem:")
     print(report.problem)
 
-    print("\nREFRAMED PROBLEM")
+    print("\nReframed Problem:")
     print(report.reframed_problem)
 
-    print("\nKEY QUESTIONS")
-    for question in report.key_questions:
-        print(f"- {question}")
+    print("\nEvidence Profile:")
+    for item in report.evidence_profile:
+        print("-", item)
 
-    print("\nPOSSIBLE ROOT CAUSES")
+    print("\nEvidence Gaps:")
+    for item in report.evidence_gaps:
+        print("-", item)
+
+    print("\nPossible Root Causes:")
     for cause in report.possible_root_causes:
-        print(f"- {cause}")
+        print("-", cause)
 
-    print("\nSOLUTION HYPOTHESES")
-    for index, solution in enumerate(report.solution_hypotheses, 1):
-        print(f"\n{index}. {solution.title}")
-        print(f"   Rationale: {solution.rationale}")
-        print("   Experiment:")
-        print(f"   {solution.experiment}")
+    print("\nSolution Hypotheses:")
+    for hypothesis in report.solution_hypotheses:
+        print("-", hypothesis.title)
 
-    print("\nVALIDATION QUESTIONS")
+    print("\nValidation Questions:")
     for question in report.validation_questions:
-        print(f"- {question}")
+        print("-", question)
