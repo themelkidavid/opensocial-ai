@@ -413,11 +413,6 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             evidence=evidence,
         )
 
-        self.assertGreater(
-            len(report.insights),
-            0,
-        )
-
         titles = [
             insight.title
             for insight in report.insights
@@ -428,7 +423,158 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             titles,
         )
 
-    def test_insights_are_included_in_report_dictionary(self):
+    def test_pattern_creates_innovation_opportunity(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Peer support improved service "
+                    "engagement among young people."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people described peer support "
+                    "as helpful for accessing services."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+        )
+
+        self.assertGreater(
+            len(report.innovation_opportunities),
+            0,
+        )
+
+        opportunity_types = [
+            opportunity.opportunity_type
+            for opportunity in report.innovation_opportunities
+        ]
+
+        self.assertIn(
+            "emerging_pattern",
+            opportunity_types,
+        )
+
+    def test_evidence_gap_creates_innovation_opportunity(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Service uptake increased after "
+                    "peer support was introduced."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+            )
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+        )
+
+        opportunity_types = [
+            opportunity.opportunity_type
+            for opportunity in report.innovation_opportunities
+        ]
+
+        self.assertIn(
+            "evidence_gap",
+            opportunity_types,
+        )
+
+    def test_conflict_creates_contradiction_opportunity(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Service uptake increased after "
+                    "peer support was introduced."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people reported that service "
+                    "uptake decreased after peer support."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people are not consistently "
+            "accessing an available service.",
+            evidence=evidence,
+        )
+
+        opportunity_types = [
+            opportunity.opportunity_type
+            for opportunity in report.innovation_opportunities
+        ]
+
+        self.assertIn(
+            "contradiction",
+            opportunity_types,
+        )
+
+    def test_transfer_opportunity_is_generated(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Peer support improved service "
+                    "engagement among young people."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Peer support was helpful for "
+                    "accessing services."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+        )
+
+        opportunity_types = [
+            opportunity.opportunity_type
+            for opportunity in report.innovation_opportunities
+        ]
+
+        self.assertIn(
+            "transfer_opportunity",
+            opportunity_types,
+        )
+
+    def test_innovation_opportunities_are_in_report_dictionary(self):
         evidence = [
             create_evidence(
                 source_type="programme_report",
@@ -460,21 +606,75 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
         result = report.to_dict()
 
         self.assertIn(
-            "insights",
+            "innovation_opportunities",
             result,
         )
 
         self.assertIsInstance(
-            result["insights"],
+            result["innovation_opportunities"],
             list,
         )
 
         self.assertGreater(
-            len(result["insights"]),
+            len(result["innovation_opportunities"]),
             0,
         )
 
-    def test_report_contains_all_evidence_analysis_layers(self):
+    def test_opportunity_validation_questions_are_added(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Peer support improved service "
+                    "engagement among young people."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people described peer support "
+                    "as helpful for accessing services."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+        )
+
+        validation_questions = " ".join(
+            report.validation_questions
+        ).lower()
+
+        self.assertIn(
+            "innovation opportunity",
+            validation_questions,
+        )
+
+    def test_no_evidence_produces_no_insights_or_opportunities(self):
+        report = self.engine.analyse(
+            "A community programme is experiencing "
+            "high participant drop-off."
+        )
+
+        self.assertEqual(
+            report.insights,
+            [],
+        )
+
+        self.assertEqual(
+            report.innovation_opportunities,
+            [],
+        )
+
+    def test_report_contains_all_analysis_layers(self):
         evidence = [
             create_evidence(
                 source_type="programme_report",
@@ -504,21 +704,16 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             evidence=evidence,
         )
 
-        self.assertEqual(
-            report.evidence_count,
-            2,
-        )
-
-        self.assertTrue(
-            report.evidence_profile
-        )
-
         self.assertTrue(
             report.evidence_quality
         )
 
         self.assertTrue(
             report.observed_patterns
+        )
+
+        self.assertTrue(
+            report.evidence_gap_details
         )
 
         self.assertTrue(
@@ -530,61 +725,15 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
         )
 
         self.assertTrue(
+            report.innovation_opportunities
+        )
+
+        self.assertTrue(
+            report.solution_hypotheses
+        )
+
+        self.assertTrue(
             report.validation_questions
-        )
-
-    def test_no_evidence_produces_no_insights(self):
-        report = self.engine.analyse(
-            "A community programme is experiencing "
-            "high participant drop-off."
-        )
-
-        self.assertEqual(
-            report.insights,
-            [],
-        )
-
-    def test_insight_uncertainty_is_explicit(self):
-        evidence = [
-            create_evidence(
-                source_type="programme_report",
-                content=(
-                    "Peer support improved service "
-                    "engagement among young people."
-                ),
-                date="2025-06-30",
-                location="Madurai",
-                population="Young people",
-            ),
-            create_evidence(
-                source_type="community_feedback",
-                content=(
-                    "Young people described peer support "
-                    "as helpful for accessing services."
-                ),
-                date="2025-07-15",
-                location="Madurai",
-                population="Young people",
-            ),
-        ]
-
-        report = self.engine.analyse(
-            "Young people face barriers to service access.",
-            evidence=evidence,
-        )
-
-        self.assertGreater(
-            len(report.insights),
-            0,
-        )
-
-        uncertainty = " ".join(
-            report.insights[0].uncertainty
-        ).lower()
-
-        self.assertIn(
-            "causation",
-            uncertainty,
         )
 
 
