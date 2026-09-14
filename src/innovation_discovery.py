@@ -1,23 +1,15 @@
 """
 OpenSocial AI – Innovation Discovery Engine
 
-Version 2
+Version 3.1
 
-The engine combines a problem description with structured evidence.
+Combines a problem description with structured evidence and
+observable patterns discovered from that evidence.
 
-The evidence-aware layer is intentionally deterministic and transparent.
-It does not claim to discover complex patterns from documents yet.
+The engine remains model-independent and transparent.
 
-Its purpose is to establish a reliable interface between the
-Evidence Layer and the Innovation Discovery Engine.
-
-Future versions can add:
-- pattern discovery
-- statistical analysis
-- document analysis
-- AI-assisted reasoning
-- cross-source synthesis
-- solution generation based on evidence
+AI-assisted reasoning can be added later without changing
+the evidence and pattern interfaces.
 """
 
 from dataclasses import dataclass, asdict, field
@@ -25,8 +17,16 @@ from typing import Dict, List, Optional
 
 try:
     from src.evidence import EvidenceItem
+    from src.pattern_discovery import (
+        PatternDiscovery,
+        ObservedPattern,
+    )
 except ModuleNotFoundError:
     from evidence import EvidenceItem
+    from pattern_discovery import (
+        PatternDiscovery,
+        ObservedPattern,
+    )
 
 
 @dataclass
@@ -56,6 +56,11 @@ class InnovationReport:
     evidence_profile: List[str] = field(default_factory=list)
     evidence_gaps: List[str] = field(default_factory=list)
 
+    # Pattern discovery field.
+    observed_patterns: List[ObservedPattern] = field(
+        default_factory=list
+    )
+
     def to_dict(self) -> Dict:
         """Return the complete report as a dictionary."""
 
@@ -74,9 +79,14 @@ class InnovationDiscoveryEngine:
     2. Evidence-aware mode:
        analyse(problem, evidence=[...])
 
-    Existing users of the engine can continue using the original
-    analyse(problem) interface.
+    When evidence is supplied, the engine also runs the
+    PatternDiscovery layer.
     """
+
+    def __init__(self) -> None:
+        """Initialise the innovation discovery engine."""
+
+        self.pattern_discovery = PatternDiscovery()
 
     def analyse(
         self,
@@ -84,11 +94,10 @@ class InnovationDiscoveryEngine:
         evidence: Optional[List[EvidenceItem]] = None,
     ) -> InnovationReport:
         """
-        Analyse a problem and optionally incorporate structured evidence.
+        Analyse a problem and optionally incorporate evidence.
 
-        Evidence is currently used to build a transparent evidence profile
-        and identify important evidence gaps. Complex pattern discovery
-        will be added in a later version.
+        Evidence is profiled and passed through the pattern
+        discovery layer before the innovation report is created.
         """
 
         if not problem or not problem.strip():
@@ -100,6 +109,10 @@ class InnovationDiscoveryEngine:
         self._validate_evidence(evidence)
 
         evidence_profile, evidence_gaps = self._build_evidence_profile(
+            evidence
+        )
+
+        observed_patterns = self.pattern_discovery.discover(
             evidence
         )
 
@@ -124,6 +137,7 @@ class InnovationDiscoveryEngine:
                 [
                     "Which evidence items support or challenge the current explanation?",
                     "Where do different evidence sources agree or disagree?",
+                    "Which observed patterns deserve further investigation?",
                     "What important information is still absent from the available evidence?",
                 ]
             )
@@ -225,11 +239,14 @@ class InnovationDiscoveryEngine:
             evidence_count=len(evidence),
             evidence_profile=evidence_profile,
             evidence_gaps=evidence_gaps,
+            observed_patterns=observed_patterns,
         )
 
     @staticmethod
-    def _validate_evidence(evidence: List[EvidenceItem]) -> None:
-        """Validate evidence before it enters the analysis layer."""
+    def _validate_evidence(
+        evidence: List[EvidenceItem],
+    ) -> None:
+        """Validate evidence before analysis."""
 
         for item in evidence:
             if not isinstance(item, EvidenceItem):
@@ -251,11 +268,7 @@ class InnovationDiscoveryEngine:
     def _build_evidence_profile(
         evidence: List[EvidenceItem],
     ) -> tuple[List[str], List[str]]:
-        """
-        Build a transparent summary of the available evidence.
-
-        This is deliberately descriptive rather than predictive.
-        """
+        """Build a transparent profile of the available evidence."""
 
         if not evidence:
             profile = [
@@ -358,32 +371,52 @@ class InnovationDiscoveryEngine:
 if __name__ == "__main__":
     engine = InnovationDiscoveryEngine()
 
+    evidence = [
+        EvidenceItem(
+            source_type="programme_report",
+            content=(
+                "Service uptake increased after peer support "
+                "was introduced."
+            ),
+            date="2025-06-30",
+            location="Madurai",
+            population="Young people",
+        ),
+        EvidenceItem(
+            source_type="community_feedback",
+            content=(
+                "Young people reported improved access and "
+                "increased engagement after peer support."
+            ),
+            date="2025-09-15",
+            location="Madurai",
+            population="Young people",
+        ),
+    ]
+
     report = engine.analyse(
-        "Young people are not consistently accessing an available service."
+        "Young people are not consistently accessing an available service.",
+        evidence=evidence,
     )
 
     print("Problem:")
     print(report.problem)
 
-    print("\nReframed Problem:")
-    print(report.reframed_problem)
-
     print("\nEvidence Profile:")
     for item in report.evidence_profile:
         print("-", item)
+
+    print("\nObserved Patterns:")
+    for pattern in report.observed_patterns:
+        print(
+            f"- [{pattern.pattern_type}] "
+            f"{pattern.description}"
+        )
 
     print("\nEvidence Gaps:")
     for item in report.evidence_gaps:
         print("-", item)
 
-    print("\nPossible Root Causes:")
-    for cause in report.possible_root_causes:
-        print("-", cause)
-
     print("\nSolution Hypotheses:")
     for hypothesis in report.solution_hypotheses:
         print("-", hypothesis.title)
-
-    print("\nValidation Questions:")
-    for question in report.validation_questions:
-        print("-", question)
