@@ -150,6 +150,183 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
                 strengths,
             )
 
+    def test_conflicting_evidence_is_included_in_report(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Service uptake increased after "
+                    "peer support was introduced."
+                ),
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people reported that service "
+                    "uptake decreased."
+                ),
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people are not consistently accessing "
+            "an available service.",
+            evidence=evidence,
+        )
+
+        self.assertEqual(len(report.evidence_conflicts), 1)
+
+        conflict = report.evidence_conflicts[0]
+
+        self.assertEqual(conflict.first_index, 0)
+        self.assertEqual(conflict.second_index, 1)
+
+        self.assertIn(
+            "conflicting",
+            conflict.description.lower(),
+        )
+
+    def test_non_conflicting_evidence_produces_no_conflicts(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Service uptake increased after "
+                    "peer support was introduced."
+                ),
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people reported improved "
+                    "access to the service."
+                ),
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people are not consistently accessing "
+            "an available service.",
+            evidence=evidence,
+        )
+
+        self.assertEqual(
+            report.evidence_conflicts,
+            [],
+        )
+
+    def test_conflicts_add_validation_questions(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content="Service uptake increased.",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content="Service uptake decreased.",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people are not consistently accessing "
+            "an available service.",
+            evidence=evidence,
+        )
+
+        questions = " ".join(
+            report.validation_questions
+        ).lower()
+
+        self.assertIn(
+            "disagreement",
+            questions,
+        )
+
+    def test_report_contains_all_evidence_analysis_layers(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Service uptake increased after "
+                    "peer support was introduced."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people reported that service "
+                    "uptake decreased after peer support."
+                ),
+                date="2025-09-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people are not consistently accessing "
+            "an available service.",
+            evidence=evidence,
+        )
+
+        self.assertEqual(report.evidence_count, 2)
+        self.assertEqual(len(report.evidence_quality), 2)
+        self.assertGreater(
+            len(report.observed_patterns),
+            0,
+        )
+        self.assertEqual(
+            len(report.evidence_conflicts),
+            1,
+        )
+
+        self.assertIsInstance(
+            report.evidence_gaps,
+            list,
+        )
+
+    def test_report_can_be_converted_to_dict(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content="Service uptake increased.",
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            )
+        ]
+
+        report = self.engine.analyse(
+            "Community members are not consistently "
+            "using a service.",
+            evidence=evidence,
+        )
+
+        result = report.to_dict()
+
+        self.assertIn("problem", result)
+        self.assertIn("evidence_count", result)
+        self.assertIn("evidence_quality", result)
+        self.assertIn("evidence_conflicts", result)
+        self.assertIn("observed_patterns", result)
+        self.assertIn("evidence_gaps", result)
+        self.assertIn("solution_hypotheses", result)
+
 
 if __name__ == "__main__":
     unittest.main()
