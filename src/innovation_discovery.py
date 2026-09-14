@@ -1,7 +1,7 @@
 """
 OpenSocial AI – Innovation Discovery Engine
 
-Version 4.4
+Version 4.5
 
 Combines:
 - a problem description
@@ -11,12 +11,13 @@ Combines:
 - evidence gap analysis
 - evidence conflict detection
 - evidence-grounded insight generation
+- innovation opportunity detection
 
 The engine remains model-independent and transparent.
 
 AI-assisted reasoning can be added later without changing
 the evidence, quality, pattern, conflict, evidence-gap,
-or insight interfaces.
+insight, or opportunity interfaces.
 """
 
 from dataclasses import dataclass, asdict, field
@@ -45,6 +46,10 @@ try:
         InsightGenerator,
         InsightCandidate,
     )
+    from src.innovation_opportunity import (
+        InnovationOpportunityDetector,
+        InnovationOpportunity,
+    )
 except ModuleNotFoundError:
     from evidence import EvidenceItem
     from pattern_discovery import (
@@ -66,6 +71,10 @@ except ModuleNotFoundError:
     from insight_generation import (
         InsightGenerator,
         InsightCandidate,
+    )
+    from innovation_opportunity import (
+        InnovationOpportunityDetector,
+        InnovationOpportunity,
     )
 
 
@@ -92,9 +101,11 @@ class InnovationReport:
     validation_questions: List[str]
 
     evidence_count: int = 0
+
     evidence_profile: List[str] = field(
         default_factory=list
     )
+
     evidence_gaps: List[str] = field(
         default_factory=list
     )
@@ -102,6 +113,7 @@ class InnovationReport:
     observed_patterns: List[ObservedPattern] = field(
         default_factory=list
     )
+
     evidence_gap_details: List[EvidenceGap] = field(
         default_factory=list
     )
@@ -115,6 +127,10 @@ class InnovationReport:
     )
 
     insights: List[InsightCandidate] = field(
+        default_factory=list
+    )
+
+    innovation_opportunities: List[InnovationOpportunity] = field(
         default_factory=list
     )
 
@@ -136,7 +152,7 @@ class InnovationDiscoveryEngine:
     2. Evidence-aware mode:
        analyse(problem, evidence=[...])
 
-    When evidence is supplied, the engine runs:
+    Evidence-aware analysis runs:
 
         Evidence
            ↓
@@ -150,6 +166,8 @@ class InnovationDiscoveryEngine:
            ↓
         Insight Generation
            ↓
+        Innovation Opportunity Detection
+           ↓
         Innovation Report
     """
 
@@ -157,10 +175,26 @@ class InnovationDiscoveryEngine:
         """Initialise the analytical components."""
 
         self.pattern_discovery = PatternDiscovery()
-        self.evidence_gap_analysis = EvidenceGapAnalysis()
-        self.evidence_quality_assessor = EvidenceQualityAssessor()
-        self.evidence_conflict_detector = EvidenceConflictDetector()
-        self.insight_generator = InsightGenerator()
+
+        self.evidence_gap_analysis = (
+            EvidenceGapAnalysis()
+        )
+
+        self.evidence_quality_assessor = (
+            EvidenceQualityAssessor()
+        )
+
+        self.evidence_conflict_detector = (
+            EvidenceConflictDetector()
+        )
+
+        self.insight_generator = (
+            InsightGenerator()
+        )
+
+        self.innovation_opportunity_detector = (
+            InnovationOpportunityDetector()
+        )
 
     def analyse(
         self,
@@ -172,9 +206,9 @@ class InnovationDiscoveryEngine:
 
         Evidence is validated, quality-assessed, profiled,
         patterns are discovered, potential conflicts are
-        identified, evidence gaps are analysed, and
-        evidence-grounded insight candidates are generated
-        before the innovation report is created.
+        identified, evidence gaps are analysed, insights are
+        generated, and innovation opportunities are identified
+        before the final report is created.
         """
 
         if not problem or not problem.strip():
@@ -183,12 +217,17 @@ class InnovationDiscoveryEngine:
             )
 
         problem = problem.strip()
+
         evidence = evidence or []
 
-        self._validate_evidence(evidence)
-
-        evidence_profile = self._build_evidence_profile(
+        self._validate_evidence(
             evidence
+        )
+
+        evidence_profile = (
+            self._build_evidence_profile(
+                evidence
+            )
         )
 
         evidence_quality = [
@@ -199,8 +238,10 @@ class InnovationDiscoveryEngine:
             for item in evidence
         ]
 
-        observed_patterns = self.pattern_discovery.discover(
-            evidence
+        observed_patterns = (
+            self.pattern_discovery.discover(
+                evidence
+            )
         )
 
         evidence_conflicts = (
@@ -220,12 +261,14 @@ class InnovationDiscoveryEngine:
             for gap in evidence_gap_details
         ]
 
-        insights = self.insight_generator.generate(
-            evidence=evidence,
-            patterns=observed_patterns,
-            conflicts=evidence_conflicts,
-            evidence_gaps=evidence_gaps,
-            evidence_quality=evidence_quality,
+        insights = (
+            self.insight_generator.generate(
+                evidence=evidence,
+                patterns=observed_patterns,
+                conflicts=evidence_conflicts,
+                evidence_gaps=evidence_gaps,
+                evidence_quality=evidence_quality,
+            )
         )
 
         reframed_problem = (
@@ -332,6 +375,16 @@ class InnovationDiscoveryEngine:
             ),
         ]
 
+        innovation_opportunities = (
+            self.innovation_opportunity_detector.detect(
+                patterns=observed_patterns,
+                evidence_gaps=evidence_gap_details,
+                conflicts=evidence_conflicts,
+                insights=insights,
+                solution_hypotheses=solution_hypotheses,
+            )
+        )
+
         validation_questions = [
             "Do community members recognise this problem and its causes?",
             "What evidence supports each proposed explanation?",
@@ -358,6 +411,16 @@ class InnovationDiscoveryEngine:
                 "Which generated insights should be tested with affected communities before acting on them?"
             )
 
+        if innovation_opportunities:
+            validation_questions.extend(
+                [
+                    "Which innovation opportunity has the strongest evidence basis?",
+                    "Which opportunity should be tested first?",
+                    "What assumptions must be tested before investing significant resources?",
+                    "What would make us stop, adapt or scale the experiment?",
+                ]
+            )
+
         return InnovationReport(
             problem=problem,
             reframed_problem=reframed_problem,
@@ -373,6 +436,7 @@ class InnovationDiscoveryEngine:
             evidence_quality=evidence_quality,
             evidence_conflicts=evidence_conflicts,
             insights=insights,
+            innovation_opportunities=innovation_opportunities,
         )
 
     @staticmethod
@@ -382,7 +446,10 @@ class InnovationDiscoveryEngine:
         """Validate evidence before analysis."""
 
         for item in evidence:
-            if not isinstance(item, EvidenceItem):
+            if not isinstance(
+                item,
+                EvidenceItem,
+            ):
                 raise TypeError(
                     "All evidence items must be instances of EvidenceItem."
                 )
@@ -560,6 +627,27 @@ if __name__ == "__main__":
         )
         print(
             f"  Investigate: {insight.investigation_question}"
+        )
+
+    print("\nInnovation Opportunities:")
+    for opportunity in report.innovation_opportunities:
+        print(
+            f"- [{opportunity.opportunity_type}] "
+            f"{opportunity.title}"
+        )
+        print(
+            f"  Confidence: {opportunity.confidence}"
+        )
+        print(
+            f"  Description: {opportunity.description}"
+        )
+        print(
+            f"  Investigate: "
+            f"{opportunity.investigation_question}"
+        )
+        print(
+            f"  Experiment: "
+            f"{opportunity.suggested_experiment}"
         )
 
     print("\nSolution Hypotheses:")
