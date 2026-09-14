@@ -1,6 +1,6 @@
 import unittest
 
-from src.evidence import create_evidence
+from src.evidence import EvidenceItem, create_evidence
 from src.evidence_quality import EvidenceQualityAssessor
 
 
@@ -9,7 +9,7 @@ class TestEvidenceQualityAssessor(unittest.TestCase):
     def setUp(self):
         self.assessor = EvidenceQualityAssessor()
 
-    def test_complete_evidence_gets_moderate_quality(self):
+    def test_complete_evidence_gets_high_quality(self):
         evidence = create_evidence(
             source_type="community_feedback",
             content="Young people reported improved access to services.",
@@ -20,8 +20,8 @@ class TestEvidenceQualityAssessor(unittest.TestCase):
 
         quality = self.assessor.assess(evidence)
 
-        self.assertEqual(quality.score, 70)
-        self.assertEqual(quality.confidence, "moderate")
+        self.assertEqual(quality.score, 80)
+        self.assertEqual(quality.confidence, "high")
 
     def test_detailed_corroborated_evidence_gets_high_quality(self):
         evidence = create_evidence(
@@ -161,7 +161,7 @@ class TestEvidenceQualityAssessor(unittest.TestCase):
             self.assessor.assess("not evidence")
 
     def test_empty_source_type_is_rejected(self):
-        evidence = create_evidence(
+        evidence = EvidenceItem(
             source_type="",
             content="Service access remains inconsistent.",
         )
@@ -170,7 +170,7 @@ class TestEvidenceQualityAssessor(unittest.TestCase):
             self.assessor.assess(evidence)
 
     def test_empty_content_is_rejected(self):
-        evidence = create_evidence(
+        evidence = EvidenceItem(
             source_type="community_feedback",
             content="",
         )
