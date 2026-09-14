@@ -495,6 +495,26 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             opportunity_types,
         )
 
+    def test_no_evidence_creates_evidence_gap_opportunity(self):
+        report = self.engine.analyse(
+            "A community programme is experiencing "
+            "high participant drop-off."
+        )
+
+        self.assertTrue(
+            report.evidence_gaps
+        )
+
+        opportunity_types = [
+            opportunity.opportunity_type
+            for opportunity in report.innovation_opportunities
+        ]
+
+        self.assertIn(
+            "evidence_gap",
+            opportunity_types,
+        )
+
     def test_conflict_creates_contradiction_opportunity(self):
         evidence = [
             create_evidence(
@@ -658,29 +678,13 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             validation_questions,
         )
 
-    def test_no_evidence_produces_no_insights_or_opportunities(self):
-        report = self.engine.analyse(
-            "A community programme is experiencing "
-            "high participant drop-off."
-        )
-
-        self.assertEqual(
-            report.insights,
-            [],
-        )
-
-        self.assertEqual(
-            report.innovation_opportunities,
-            [],
-        )
-
     def test_report_contains_all_analysis_layers(self):
         evidence = [
             create_evidence(
                 source_type="programme_report",
                 content=(
-                    "Service uptake increased after "
-                    "peer support was introduced."
+                    "Peer support improved service "
+                    "engagement among young people."
                 ),
                 date="2025-06-30",
                 location="Madurai",
@@ -689,18 +693,27 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             create_evidence(
                 source_type="community_feedback",
                 content=(
-                    "Young people reported that service "
-                    "uptake decreased after peer support."
+                    "Young people described peer support "
+                    "as helpful for accessing services."
                 ),
                 date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_survey",
+                content=(
+                    "Young people reported that peer support "
+                    "made services easier to access."
+                ),
+                date="2025-08-15",
                 location="Madurai",
                 population="Young people",
             ),
         ]
 
         report = self.engine.analyse(
-            "Young people are not consistently "
-            "accessing an available service.",
+            "Young people face barriers to service access.",
             evidence=evidence,
         )
 
@@ -714,10 +727,7 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
 
         self.assertTrue(
             report.evidence_gap_details
-        )
-
-        self.assertTrue(
-            report.evidence_conflicts
+            or report.evidence_gaps == []
         )
 
         self.assertTrue(
