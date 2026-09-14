@@ -47,6 +47,7 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
         self.assertEqual(report.evidence_count, 0)
         self.assertGreater(len(report.evidence_profile), 0)
         self.assertGreater(len(report.evidence_gaps), 0)
+        self.assertEqual(report.observed_patterns, [])
 
     def test_analysis_accepts_evidence(self):
         evidence = [
@@ -75,20 +76,20 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
         self.assertGreater(len(report.evidence_profile), 0)
         self.assertEqual(len(report.evidence_gaps), 0)
 
-    def test_evidence_profile_reflects_multiple_sources(self):
+    def test_engine_returns_observed_patterns(self):
         evidence = [
             create_evidence(
                 source_type="programme_report",
-                content="Programme uptake was low.",
+                content="Service uptake increased.",
                 date="2025-01-01",
-                location="Chennai",
+                location="Madurai",
                 population="Young people",
             ),
             create_evidence(
                 source_type="community_feedback",
-                content="Participants reported access difficulties.",
-                date="2025-02-01",
-                location="Chennai",
+                content="Service uptake improved.",
+                date="2025-06-01",
+                location="Madurai",
                 population="Young people",
             ),
         ]
@@ -98,12 +99,45 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             evidence=evidence,
         )
 
-        profile_text = " ".join(report.evidence_profile)
+        self.assertGreater(len(report.observed_patterns), 0)
 
-        self.assertIn("2 evidence item(s) supplied.", profile_text)
-        self.assertIn("programme_report", profile_text)
-        self.assertIn("community_feedback", profile_text)
-        self.assertIn("Multiple evidence source types", profile_text)
+        pattern_types = {
+            pattern.pattern_type
+            for pattern in report.observed_patterns
+        }
+
+        self.assertIn("location", pattern_types)
+        self.assertIn("population", pattern_types)
+        self.assertIn("time_span", pattern_types)
+
+    def test_observed_patterns_are_evidence_based(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content="Service access improved.",
+                location="Chennai",
+                population="Women",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content="Service access improved.",
+                location="Chennai",
+                population="Women",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Service access is inconsistent.",
+            evidence=evidence,
+        )
+
+        descriptions = " ".join(
+            pattern.description
+            for pattern in report.observed_patterns
+        )
+
+        self.assertIn("Chennai", descriptions)
+        self.assertIn("Women", descriptions)
 
     def test_evidence_gaps_identify_missing_metadata(self):
         evidence = [
@@ -136,6 +170,7 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
         self.assertIn("evidence_count", result)
         self.assertIn("evidence_profile", result)
         self.assertIn("evidence_gaps", result)
+        self.assertIn("observed_patterns", result)
 
 
 if __name__ == "__main__":
