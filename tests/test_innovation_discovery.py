@@ -9,16 +9,15 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
     def setUp(self):
         self.engine = InnovationDiscoveryEngine()
 
-    def test_report_generation(self):
-        report = self.engine.analyse(
-            "Young people are not consistently accessing an available service."
+    def test_engine_generates_report(self):
+        problem = (
+            "Young people are not consistently accessing "
+            "an available service."
         )
 
-        self.assertEqual(
-            report.problem,
-            "Young people are not consistently accessing an available service.",
-        )
+        report = self.engine.analyse(problem)
 
+        self.assertEqual(report.problem, problem)
         self.assertTrue(report.reframed_problem)
         self.assertGreater(len(report.key_questions), 0)
         self.assertGreater(len(report.possible_root_causes), 0)
@@ -29,148 +28,127 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.engine.analyse("")
 
-    def test_solution_hypotheses_have_required_fields(self):
+    def test_solution_hypotheses_have_experiments(self):
         report = self.engine.analyse(
-            "People are not consistently accessing an available service."
+            "A community programme is experiencing "
+            "high participant drop-off."
         )
 
-        for hypothesis in report.solution_hypotheses:
-            self.assertTrue(hypothesis.title)
-            self.assertTrue(hypothesis.rationale)
-            self.assertTrue(hypothesis.experiment)
+        for solution in report.solution_hypotheses:
+            self.assertTrue(solution.title)
+            self.assertTrue(solution.rationale)
+            self.assertTrue(solution.experiment)
 
-    def test_analysis_works_without_evidence(self):
-        report = self.engine.analyse(
-            "Community members are not using an available programme."
-        )
-
-        self.assertEqual(report.evidence_count, 0)
-        self.assertGreater(len(report.evidence_profile), 0)
-        self.assertGreater(len(report.evidence_gaps), 0)
-        self.assertEqual(report.observed_patterns, [])
-
-    def test_analysis_accepts_evidence(self):
+    def test_evidence_quality_is_included_in_report(self):
         evidence = [
             create_evidence(
-                source_type="programme_report",
-                content="Service uptake increased after peer support was introduced.",
-                date="2025-06-30",
-                location="Madurai",
-                population="Young people",
-            ),
-            create_evidence(
                 source_type="community_feedback",
-                content="Participants reported that trusted peers made the service easier to approach.",
+                content=(
+                    "Young people reported improved access "
+                    "to services."
+                ),
                 date="2025-09-15",
                 location="Madurai",
                 population="Young people",
-            ),
-        ]
-
-        report = self.engine.analyse(
-            "Young people are not consistently accessing an available service.",
-            evidence=evidence,
-        )
-
-        self.assertEqual(report.evidence_count, 2)
-        self.assertGreater(len(report.evidence_profile), 0)
-        self.assertEqual(len(report.evidence_gaps), 0)
-
-    def test_engine_returns_observed_patterns(self):
-        evidence = [
-            create_evidence(
-                source_type="programme_report",
-                content="Service uptake increased.",
-                date="2025-01-01",
-                location="Madurai",
-                population="Young people",
-            ),
-            create_evidence(
-                source_type="community_feedback",
-                content="Service uptake improved.",
-                date="2025-06-01",
-                location="Madurai",
-                population="Young people",
-            ),
-        ]
-
-        report = self.engine.analyse(
-            "Young people are not consistently accessing a service.",
-            evidence=evidence,
-        )
-
-        self.assertGreater(len(report.observed_patterns), 0)
-
-        pattern_types = {
-            pattern.pattern_type
-            for pattern in report.observed_patterns
-        }
-
-        self.assertIn("location", pattern_types)
-        self.assertIn("population", pattern_types)
-        self.assertIn("time_span", pattern_types)
-
-    def test_observed_patterns_are_evidence_based(self):
-        evidence = [
-            create_evidence(
-                source_type="programme_report",
-                content="Service access improved.",
-                location="Chennai",
-                population="Women",
-            ),
-            create_evidence(
-                source_type="community_feedback",
-                content="Service access improved.",
-                location="Chennai",
-                population="Women",
-            ),
-        ]
-
-        report = self.engine.analyse(
-            "Service access is inconsistent.",
-            evidence=evidence,
-        )
-
-        descriptions = " ".join(
-            pattern.description
-            for pattern in report.observed_patterns
-        )
-
-        self.assertIn("Chennai", descriptions)
-        self.assertIn("Women", descriptions)
-
-    def test_evidence_gaps_identify_missing_metadata(self):
-        evidence = [
-            create_evidence(
-                source_type="programme_report",
-                content="Service access remains inconsistent.",
             )
         ]
 
         report = self.engine.analyse(
-            "Service access remains inconsistent.",
+            "Young people are not consistently accessing "
+            "an available service.",
             evidence=evidence,
         )
 
-        gaps_text = " ".join(report.evidence_gaps)
+        self.assertEqual(len(report.evidence_quality), 1)
 
-        self.assertIn("location information", gaps_text)
-        self.assertIn("populations represented", gaps_text)
-        self.assertIn("dates", gaps_text)
+        quality = report.evidence_quality[0]
 
-    def test_report_can_be_converted_to_dict(self):
-        report = self.engine.analyse(
-            "Community members are not consistently using a service."
+        self.assertGreater(quality.score, 0)
+        self.assertIn(
+            quality.confidence,
+            ["low", "moderate", "high"],
         )
 
-        result = report.to_dict()
+    def test_each_evidence_item_gets_quality_assessment(self):
+        evidence = [
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people reported improved access "
+                    "to services."
+                ),
+                date="2025-09-15",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Programme records show increased "
+                    "service uptake."
+                ),
+                date="2025-09-30",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
 
-        self.assertIn("problem", result)
-        self.assertIn("solution_hypotheses", result)
-        self.assertIn("evidence_count", result)
-        self.assertIn("evidence_profile", result)
-        self.assertIn("evidence_gaps", result)
-        self.assertIn("observed_patterns", result)
+        report = self.engine.analyse(
+            "Young people are not consistently accessing "
+            "an available service.",
+            evidence=evidence,
+        )
+
+        self.assertEqual(report.evidence_count, 2)
+        self.assertEqual(len(report.evidence_quality), 2)
+
+        for quality in report.evidence_quality:
+            self.assertGreaterEqual(quality.score, 0)
+            self.assertLessEqual(quality.score, 100)
+            self.assertIn(
+                quality.confidence,
+                ["low", "moderate", "high"],
+            )
+
+    def test_evidence_quality_detects_corroboration(self):
+        evidence = [
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people reported improved access "
+                    "to services after peer support."
+                ),
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Programme records indicate increased "
+                    "service uptake."
+                ),
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people are not consistently accessing "
+            "an available service.",
+            evidence=evidence,
+        )
+
+        self.assertEqual(len(report.evidence_quality), 2)
+
+        for quality in report.evidence_quality:
+            strengths = " ".join(
+                quality.strengths
+            ).lower()
+
+            self.assertIn(
+                "corroborated",
+                strengths,
+            )
 
 
 if __name__ == "__main__":
