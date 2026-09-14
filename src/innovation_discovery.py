@@ -429,3 +429,4 @@ if __name__ == "__main__":
     print("\nSolution Hypotheses:")
     for hypothesis in report.solution_hypotheses:
         print("-", hypothesis.title)
+        
