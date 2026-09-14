@@ -1,15 +1,18 @@
 """
 OpenSocial AI – Innovation Discovery Engine
 
-Version 3.1
+Version 4.1
 
-Combines a problem description with structured evidence and
-observable patterns discovered from that evidence.
+Combines:
+- a problem description
+- structured evidence
+- observable patterns
+- evidence gap analysis
 
 The engine remains model-independent and transparent.
 
 AI-assisted reasoning can be added later without changing
-the evidence and pattern interfaces.
+the evidence, pattern, or evidence-gap interfaces.
 """
 
 from dataclasses import dataclass, asdict, field
@@ -21,11 +24,19 @@ try:
         PatternDiscovery,
         ObservedPattern,
     )
+    from src.evidence_gap import (
+        EvidenceGapAnalysis,
+        EvidenceGap,
+    )
 except ModuleNotFoundError:
     from evidence import EvidenceItem
     from pattern_discovery import (
         PatternDiscovery,
         ObservedPattern,
+    )
+    from evidence_gap import (
+        EvidenceGapAnalysis,
+        EvidenceGap,
     )
 
 
@@ -56,8 +67,13 @@ class InnovationReport:
     evidence_profile: List[str] = field(default_factory=list)
     evidence_gaps: List[str] = field(default_factory=list)
 
-    # Pattern discovery field.
+    # Pattern discovery.
     observed_patterns: List[ObservedPattern] = field(
+        default_factory=list
+    )
+
+    # Rich evidence-gap results.
+    evidence_gap_details: List[EvidenceGap] = field(
         default_factory=list
     )
 
@@ -79,14 +95,22 @@ class InnovationDiscoveryEngine:
     2. Evidence-aware mode:
        analyse(problem, evidence=[...])
 
-    When evidence is supplied, the engine also runs the
-    PatternDiscovery layer.
+    When evidence is supplied, the engine runs:
+
+        Evidence
+           ↓
+        Pattern Discovery
+           ↓
+        Evidence Gap Analysis
+           ↓
+        Innovation Report
     """
 
     def __init__(self) -> None:
-        """Initialise the innovation discovery engine."""
+        """Initialise the analytical components."""
 
         self.pattern_discovery = PatternDiscovery()
+        self.evidence_gap_analysis = EvidenceGapAnalysis()
 
     def analyse(
         self,
@@ -96,8 +120,8 @@ class InnovationDiscoveryEngine:
         """
         Analyse a problem and optionally incorporate evidence.
 
-        Evidence is profiled and passed through the pattern
-        discovery layer before the innovation report is created.
+        Evidence is profiled, patterns are discovered, and evidence
+        gaps are identified before the innovation report is created.
         """
 
         if not problem or not problem.strip():
@@ -108,13 +132,20 @@ class InnovationDiscoveryEngine:
 
         self._validate_evidence(evidence)
 
-        evidence_profile, evidence_gaps = self._build_evidence_profile(
-            evidence
-        )
+        evidence_profile = self._build_evidence_profile(evidence)
 
         observed_patterns = self.pattern_discovery.discover(
             evidence
         )
+
+        evidence_gap_details = self.evidence_gap_analysis.discover(
+            evidence
+        )
+
+        evidence_gaps = [
+            gap.description
+            for gap in evidence_gap_details
+        ]
 
         reframed_problem = (
             f"Instead of assuming that '{problem}' has a single cause, "
@@ -138,6 +169,7 @@ class InnovationDiscoveryEngine:
                     "Which evidence items support or challenge the current explanation?",
                     "Where do different evidence sources agree or disagree?",
                     "Which observed patterns deserve further investigation?",
+                    "Which evidence gaps are most important to address first?",
                     "What important information is still absent from the available evidence?",
                 ]
             )
@@ -240,6 +272,7 @@ class InnovationDiscoveryEngine:
             evidence_profile=evidence_profile,
             evidence_gaps=evidence_gaps,
             observed_patterns=observed_patterns,
+            evidence_gap_details=evidence_gap_details,
         )
 
     @staticmethod
@@ -267,22 +300,13 @@ class InnovationDiscoveryEngine:
     @staticmethod
     def _build_evidence_profile(
         evidence: List[EvidenceItem],
-    ) -> tuple[List[str], List[str]]:
+    ) -> List[str]:
         """Build a transparent profile of the available evidence."""
 
         if not evidence:
-            profile = [
+            return [
                 "No evidence items supplied. The engine is operating in baseline mode."
             ]
-
-            gaps = [
-                "No evidence has been supplied.",
-                "Historical change cannot be assessed without dated evidence.",
-                "Differences across locations cannot be assessed without location data.",
-                "Differences across populations cannot be assessed without population data.",
-            ]
-
-            return profile, gaps
 
         source_types = sorted(
             {
@@ -325,47 +349,28 @@ class InnovationDiscoveryEngine:
             ),
         ]
 
-        gaps: List[str] = []
-
         if len(source_types) > 1:
             profile.append(
                 "Multiple evidence source types are represented, "
                 "enabling cross-source comparison."
-            )
-        else:
-            gaps.append(
-                "Only one evidence source type is represented; "
-                "cross-source comparison is limited."
             )
 
         if locations:
             profile.append(
                 f"Locations represented: {', '.join(locations)}."
             )
-        else:
-            gaps.append(
-                "No location information is available for the evidence."
-            )
 
         if populations:
             profile.append(
                 f"Populations represented: {', '.join(populations)}."
-            )
-        else:
-            gaps.append(
-                "No population information is available for the evidence."
             )
 
         if dates:
             profile.append(
                 f"Dates represented: {', '.join(dates)}."
             )
-        else:
-            gaps.append(
-                "No dates are available; change over time cannot yet be assessed."
-            )
 
-        return profile, gaps
+        return profile
 
 
 if __name__ == "__main__":
@@ -414,8 +419,15 @@ if __name__ == "__main__":
         )
 
     print("\nEvidence Gaps:")
-    for item in report.evidence_gaps:
-        print("-", item)
+    for gap in report.evidence_gap_details:
+        print(
+            f"- [{gap.priority}] "
+            f"{gap.description}"
+        )
+        print(
+            f"  Investigate: "
+            f"{gap.investigation_question}"
+        )
 
     print("\nSolution Hypotheses:")
     for hypothesis in report.solution_hypotheses:
