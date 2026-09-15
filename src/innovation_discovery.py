@@ -1,7 +1,7 @@
 """
 OpenSocial AI – Innovation Discovery Engine
 
-Version 5.0
+Version 5.1
 
 Combines:
 - a problem description
@@ -12,6 +12,7 @@ Combines:
 - evidence conflict detection
 - evidence-grounded insight generation
 - innovation opportunity detection
+- innovation inspiration
 - innovation reasoning
 - innovation hypothesis generation
 
@@ -19,7 +20,7 @@ The engine remains model-independent and transparent.
 
 AI-assisted reasoning can be added later without changing
 the evidence, quality, pattern, conflict, evidence-gap,
-insight, or opportunity interfaces.
+insight, opportunity, inspiration or reasoning interfaces.
 """
 
 from dataclasses import dataclass, asdict, field
@@ -59,6 +60,10 @@ try:
         InnovationOpportunity,
     )
 
+    from src.innovation_inspiration import (
+        InnovationInspiration,
+    )
+
     from src.innovation_reasoning import (
         InnovationReasoningEngine,
         InnovationHypothesis,
@@ -96,6 +101,10 @@ except ModuleNotFoundError:
     from innovation_opportunity import (
         InnovationOpportunityDetector,
         InnovationOpportunity,
+    )
+
+    from innovation_inspiration import (
+        InnovationInspiration,
     )
 
     from innovation_reasoning import (
@@ -182,6 +191,13 @@ class InnovationDiscoveryEngine:
     2. Evidence-aware mode:
        analyse(problem, evidence=[...])
 
+    3. Evidence + inspiration mode:
+       analyse(
+           problem,
+           evidence=[...],
+           inspirations=[...],
+       )
+
     Evidence-aware analysis runs:
 
         Evidence
@@ -238,16 +254,23 @@ class InnovationDiscoveryEngine:
         self,
         problem: str,
         evidence: Optional[List[EvidenceItem]] = None,
+        inspirations: Optional[
+            List[InnovationInspiration]
+        ] = None,
     ) -> InnovationReport:
         """
-        Analyse a problem and optionally incorporate evidence.
+        Analyse a problem and optionally incorporate evidence
+        and innovation inspiration.
 
         Evidence is validated, quality-assessed, profiled,
         patterns are discovered, potential conflicts are
         identified, evidence gaps are analysed, insights are
         generated, innovation opportunities are identified,
-        and innovation hypotheses are generated before the
-        final report is created.
+        and innovation hypotheses are generated.
+
+        External inspiration can be supplied to help the
+        reasoning layer identify mechanisms that may be
+        adapted to the current problem.
         """
 
         if not problem or not problem.strip():
@@ -259,8 +282,14 @@ class InnovationDiscoveryEngine:
 
         evidence = evidence or []
 
+        inspirations = inspirations or []
+
         self._validate_evidence(
             evidence
+        )
+
+        self._validate_inspirations(
+            inspirations
         )
 
         evidence_profile = (
@@ -432,6 +461,7 @@ class InnovationDiscoveryEngine:
                 self.innovation_reasoning_engine.generate(
                     problem=problem,
                     opportunities=innovation_opportunities,
+                    inspirations=inspirations,
                 )
             )
 
@@ -527,6 +557,22 @@ class InnovationDiscoveryEngine:
                 )
 
     @staticmethod
+    def _validate_inspirations(
+        inspirations: List[InnovationInspiration],
+    ) -> None:
+        """Validate innovation inspiration before analysis."""
+
+        for inspiration in inspirations:
+            if not isinstance(
+                inspiration,
+                InnovationInspiration,
+            ):
+                raise TypeError(
+                    "All inspirations must be instances "
+                    "of InnovationInspiration."
+                )
+
+    @staticmethod
     def _build_evidence_profile(
         evidence: List[EvidenceItem],
     ) -> List[str]:
@@ -534,7 +580,8 @@ class InnovationDiscoveryEngine:
 
         if not evidence:
             return [
-                "No evidence items supplied. The engine is operating in baseline mode."
+                "No evidence items supplied. "
+                "The engine is operating in baseline mode."
             ]
 
         source_types = sorted(
@@ -589,17 +636,20 @@ class InnovationDiscoveryEngine:
 
         if locations:
             profile.append(
-                f"Locations represented: {', '.join(locations)}."
+                f"Locations represented: "
+                f"{', '.join(locations)}."
             )
 
         if populations:
             profile.append(
-                f"Populations represented: {', '.join(populations)}."
+                f"Populations represented: "
+                f"{', '.join(populations)}."
             )
 
         if dates:
             profile.append(
-                f"Dates represented: {', '.join(dates)}."
+                f"Dates represented: "
+                f"{', '.join(dates)}."
             )
 
         return profile
@@ -632,7 +682,8 @@ if __name__ == "__main__":
     ]
 
     report = engine.analyse(
-        "Young people are not consistently accessing an available service.",
+        "Young people are not consistently accessing "
+        "an available service.",
         evidence=evidence,
     )
 
@@ -688,7 +739,8 @@ if __name__ == "__main__":
             f"  Confidence: {insight.confidence}"
         )
         print(
-            f"  Investigate: {insight.investigation_question}"
+            f"  Investigate: "
+            f"{insight.investigation_question}"
         )
 
     print("\nInnovation Opportunities:")
@@ -716,6 +768,10 @@ if __name__ == "__main__":
     for hypothesis in report.innovation_hypotheses:
         print(
             f"- {hypothesis.title}"
+        )
+        print(
+            f"  Problem Connection: "
+            f"{hypothesis.problem_connection}"
         )
         print(
             f"  Inspiration: "
@@ -748,4 +804,7 @@ if __name__ == "__main__":
 
     print("\nSolution Hypotheses:")
     for hypothesis in report.solution_hypotheses:
-        print("-", hypothesis.title)
+        print(
+            "-",
+            hypothesis.title,
+        )
