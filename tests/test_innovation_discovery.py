@@ -678,6 +678,144 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             validation_questions,
         )
 
+    def test_innovation_hypotheses_are_generated(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Peer support improved service engagement "
+                    "among young people."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people described peer support as "
+                    "helpful for accessing services."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+        )
+
+        self.assertGreater(
+            len(report.innovation_hypotheses),
+            0,
+        )
+
+    def test_innovation_hypotheses_have_required_fields(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Peer support improved service engagement "
+                    "among young people."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people described peer support as "
+                    "helpful for accessing services."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+        )
+
+        self.assertGreater(
+            len(report.innovation_hypotheses),
+            0,
+        )
+
+        for hypothesis in report.innovation_hypotheses:
+            self.assertTrue(hypothesis.title)
+            self.assertTrue(hypothesis.problem_connection)
+            self.assertTrue(hypothesis.inspiration_source)
+            self.assertTrue(hypothesis.underlying_mechanism)
+            self.assertTrue(hypothesis.novel_combination)
+            self.assertTrue(hypothesis.why_it_might_work)
+            self.assertTrue(hypothesis.evidence_basis)
+            self.assertTrue(hypothesis.confidence)
+            self.assertTrue(hypothesis.uncertainty)
+            self.assertTrue(hypothesis.experiment)
+            self.assertTrue(hypothesis.validation_question)
+
+    def test_innovation_hypotheses_are_in_report_dictionary(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Peer support improved service engagement "
+                    "among young people."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people described peer support as "
+                    "helpful for accessing services."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+        )
+
+        result = report.to_dict()
+
+        self.assertIn(
+            "innovation_hypotheses",
+            result,
+        )
+
+        self.assertIsInstance(
+            result["innovation_hypotheses"],
+            list,
+        )
+
+        self.assertGreater(
+            len(result["innovation_hypotheses"]),
+            0,
+        )
+
+    def test_no_evidence_produces_no_innovation_hypotheses(self):
+        report = self.engine.analyse(
+            "A community programme is experiencing "
+            "high participant drop-off."
+        )
+
+        self.assertEqual(
+            report.innovation_hypotheses,
+            [],
+        )
+
     def test_report_contains_all_analysis_layers(self):
         evidence = [
             create_evidence(
@@ -736,6 +874,10 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
 
         self.assertTrue(
             report.innovation_opportunities
+        )
+
+        self.assertTrue(
+            report.innovation_hypotheses
         )
 
         self.assertTrue(
