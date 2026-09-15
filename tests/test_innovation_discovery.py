@@ -888,6 +888,210 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             report.validation_questions
         )
 
+    def test_external_inspiration_can_be_passed_to_engine(self):
+        from src.innovation_inspiration import (
+            InnovationInspirationEngine,
+        )
 
+        inspiration_engine = InnovationInspirationEngine()
+
+        inspirations = [
+            inspiration_engine.create(
+                source_type="cross_sector",
+                title="Peer navigation model",
+                context="Community health services",
+                mechanism=(
+                    "Trusted peers guide people through services."
+                ),
+                observed_result=(
+                    "Improved service engagement."
+                ),
+                transferability="moderate",
+                adaptation_notes=(
+                    "Adapt peer navigation for young people "
+                    "accessing community services."
+                ),
+            )
+        ]
+
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Peer support improved service engagement "
+                    "among young people."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Young people described peer support as "
+                    "helpful for accessing services."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+            inspirations=inspirations,
+        )
+
+        self.assertGreater(
+            len(report.innovation_hypotheses),
+            0,
+        )
+
+        combined = " ".join(
+            hypothesis.inspiration_source
+            for hypothesis in report.innovation_hypotheses
+        ).lower()
+
+        self.assertTrue(
+            "peer navigation" in combined
+            or "inspiration" in combined
+        )
+
+    def test_inspiration_is_reflected_in_innovation_hypothesis(self):
+        from src.innovation_inspiration import (
+            InnovationInspirationEngine,
+        )
+
+        inspiration_engine = InnovationInspirationEngine()
+
+        inspirations = [
+            inspiration_engine.create(
+                source_type="community",
+                title="Community peer navigator model",
+                context="Community service access",
+                mechanism=(
+                    "Trusted community members help people "
+                    "navigate services."
+                ),
+                observed_result=(
+                    "Improved participation."
+                ),
+                transferability="high",
+                adaptation_notes=(
+                    "Co-design with local community members."
+                ),
+            )
+        ]
+
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Peer support improved service engagement."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Peer support was helpful for accessing services."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+            inspirations=inspirations,
+        )
+
+        self.assertGreater(
+            len(report.innovation_hypotheses),
+            0,
+        )
+
+        hypothesis_text = " ".join(
+            [
+                report.innovation_hypotheses[0].inspiration_source,
+                report.innovation_hypotheses[0].underlying_mechanism,
+                report.innovation_hypotheses[0].novel_combination,
+            ]
+        ).lower()
+
+        self.assertTrue(
+            "peer" in hypothesis_text
+            or "community" in hypothesis_text
+        )
+
+    def test_engine_works_without_external_inspiration(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content=(
+                    "Peer support improved service engagement."
+                ),
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content=(
+                    "Peer support was helpful for accessing services."
+                ),
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+        )
+
+        self.assertGreater(
+            len(report.innovation_hypotheses),
+            0,
+        )
+
+    def test_no_evidence_produces_no_innovation_hypotheses_even_with_inspiration(
+        self,
+    ):
+        from src.innovation_inspiration import (
+            InnovationInspirationEngine,
+        )
+
+        inspiration_engine = InnovationInspirationEngine()
+
+        inspirations = [
+            inspiration_engine.create(
+                source_type="cross_sector",
+                title="Peer navigation model",
+                context="Community health services",
+                mechanism=(
+                    "Trusted peers guide people through services."
+                ),
+                observed_result=(
+                    "Improved service engagement."
+                ),
+            )
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            inspirations=inspirations,
+        )
+
+        self.assertEqual(
+            report.innovation_hypotheses,
+            [],
+        )
 if __name__ == "__main__":
     unittest.main()
