@@ -523,6 +523,98 @@ class TestInnovationReasoningEngine(unittest.TestCase):
             [],
         )
 
+    def test_multiple_inspirations_create_combined_innovation_hypothesis(self):
+        inspiration_engine = InnovationInspirationEngine()
 
+        inspirations = [
+            inspiration_engine.create(
+                source_type="cross_sector",
+                title="Peer navigation model",
+                context="Community health services",
+                mechanism=(
+                    "Trusted peers guide people through "
+                    "services."
+                ),
+                observed_result=(
+                    "Improved service engagement."
+                ),
+                transferability="moderate",
+            ),
+            inspiration_engine.create(
+                source_type="community",
+                title="Mobile outreach model",
+                context="Community service delivery",
+                mechanism=(
+                    "Services are brought closer to "
+                    "communities."
+                ),
+                observed_result=(
+                    "Improved access."
+                ),
+                transferability="moderate",
+            ),
+        ]
+
+        opportunity = SimpleNamespace(
+            opportunity_type="emerging_pattern",
+            title="Young people face service access barriers",
+            description=(
+                "Young people face barriers to accessing "
+                "community services."
+            ),
+            evidence_basis=[
+                "Programme report",
+                "Community feedback",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "The pattern does not establish causation."
+            ],
+        )
+
+        hypotheses = self.engine.generate(
+            problem=(
+                "Young people face barriers to "
+                "community service access."
+            ),
+            opportunities=[opportunity],
+            inspirations=inspirations,
+        )
+
+        self.assertGreater(
+            len(hypotheses),
+            0,
+        )
+
+        hypothesis = hypotheses[0]
+
+        combined_text = " ".join(
+            [
+                hypothesis.title,
+                hypothesis.novel_combination,
+                hypothesis.underlying_mechanism,
+                hypothesis.evidence_basis,
+            ]
+            if isinstance(
+                hypothesis.evidence_basis,
+                list,
+            )
+            else [
+                hypothesis.title,
+                hypothesis.novel_combination,
+                hypothesis.underlying_mechanism,
+                hypothesis.evidence_basis,
+            ]
+        ).lower()
+
+        self.assertIn(
+            "peer",
+            combined_text,
+        )
+
+        self.assertTrue(
+            "mobile" in combined_text
+            or "outreach" in combined_text
+        )
 if __name__ == "__main__":
     unittest.main()
