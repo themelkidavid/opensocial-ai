@@ -163,13 +163,13 @@ class InnovationCombinationEngine:
                 )
 
         uncertainty = [
-            "The combination is a design hypothesis, "
-            "not a proven intervention.",
-            "The two mechanisms may interact differently "
-            "in the target context.",
-            "The observed results from the source "
-            "inspirations may not transfer directly.",
-        ]
+    "The combination is uncertain and not proven "
+    "as an intervention.",
+    "The two mechanisms may interact differently "
+    "in the target context.",
+    "The observed results from the source "
+    "inspirations may not transfer directly.",
+]
 
         experiment = (
             "Run a small, time-bound pilot combining both "
