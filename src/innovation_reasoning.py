@@ -1,30 +1,57 @@
 """
 OpenSocial AI – Innovation Reasoning Engine
 
-Version 1.0
+Version 1.1
 
 Generates innovation hypotheses from identified innovation
-opportunities.
+opportunities and relevant sources of inspiration.
 
-The engine uses transparent reasoning strategies rather than
-claiming that generated ideas are proven solutions.
+Reasoning inputs may include:
+- innovation opportunities
+- cross-sector inspiration
+- historical approaches
+- community innovations
+- research approaches
+- international examples
 
-Reasoning strategies include:
-- cross-domain transfer
-- historical solution revival
-- novel combination
-- constraint inversion
-- pattern combination
+The engine does not claim that generated ideas are proven.
 
-The output is intended for human investigation and experimentation.
+Instead, it creates transparent hypotheses that connect:
+    problem
+        ↓
+    opportunity
+        ↓
+    inspiration
+        ↓
+    mechanism
+        ↓
+    adaptation
+        ↓
+    experiment
+        ↓
+    human validation
 """
 
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 
 
+try:
+    from src.innovation_inspiration import (
+        InnovationInspiration,
+        InnovationInspirationEngine,
+    )
+except ModuleNotFoundError:
+    from innovation_inspiration import (
+        InnovationInspiration,
+        InnovationInspirationEngine,
+    )
+
+
 @dataclass
 class InnovationHypothesis:
+    """A potential innovation idea requiring human validation."""
+
     title: str
     problem_connection: str
     inspiration_source: str
@@ -38,16 +65,43 @@ class InnovationHypothesis:
     validation_question: str
 
     def to_dict(self) -> Dict:
+        """Return the hypothesis as a dictionary."""
+
         return asdict(self)
 
 
 class InnovationReasoningEngine:
+    """
+    Generates transparent innovation hypotheses.
+
+    The engine can reason from innovation opportunities alone,
+    or combine opportunities with relevant inspiration sources.
+    """
+
+    def __init__(self) -> None:
+        """Initialise the inspiration retrieval component."""
+
+        self.inspiration_engine = (
+            InnovationInspirationEngine()
+        )
 
     def generate(
         self,
         problem: str,
         opportunities: Optional[List] = None,
+        inspirations: Optional[
+            List[InnovationInspiration]
+        ] = None,
     ) -> List[InnovationHypothesis]:
+        """
+        Generate innovation hypotheses.
+
+        If inspiration sources are supplied, relevant sources
+        are identified and incorporated into the reasoning.
+
+        If no inspiration is supplied, the engine can still
+        generate hypotheses directly from opportunities.
+        """
 
         if not problem or not problem.strip():
             raise ValueError(
@@ -55,9 +109,24 @@ class InnovationReasoningEngine:
             )
 
         opportunities = opportunities or []
+        inspirations = inspirations or []
 
         if not opportunities:
             return []
+
+        self._validate_inspirations(
+            inspirations
+        )
+
+        relevant_inspirations = []
+
+        if inspirations:
+            relevant_inspirations = (
+                self.inspiration_engine.find_relevant(
+                    problem=problem,
+                    inspirations=inspirations,
+                )
+            )
 
         hypotheses = []
 
@@ -74,6 +143,7 @@ class InnovationReasoningEngine:
                     self._generate_transfer_hypothesis(
                         problem,
                         opportunity,
+                        relevant_inspirations,
                     )
                 )
 
@@ -98,6 +168,7 @@ class InnovationReasoningEngine:
                     self._generate_transfer_hypothesis(
                         problem,
                         opportunity,
+                        relevant_inspirations,
                     )
                 )
 
@@ -106,6 +177,7 @@ class InnovationReasoningEngine:
                     self._generate_need_hypothesis(
                         problem,
                         opportunity,
+                        relevant_inspirations,
                     )
                 )
 
@@ -115,7 +187,20 @@ class InnovationReasoningEngine:
         self,
         problem: str,
         opportunity,
+        relevant_inspirations: Optional[
+            List[InnovationInspiration]
+        ] = None,
     ) -> InnovationHypothesis:
+        """
+        Generate a transfer-oriented hypothesis.
+
+        When relevant inspiration exists, use its mechanism
+        as an explicit source for adaptation.
+        """
+
+        relevant_inspirations = (
+            relevant_inspirations or []
+        )
 
         description = getattr(
             opportunity,
@@ -123,10 +208,12 @@ class InnovationReasoningEngine:
             "A promising pattern was identified.",
         )
 
-        evidence_basis = getattr(
-            opportunity,
-            "evidence_basis",
-            [],
+        evidence_basis = list(
+            getattr(
+                opportunity,
+                "evidence_basis",
+                [],
+            )
         )
 
         uncertainty = list(
@@ -137,33 +224,107 @@ class InnovationReasoningEngine:
             )
         )
 
-        uncertainty.append(
-            "The transferred mechanism may not work "
-            "under the same conditions as the original context."
-        )
+        if relevant_inspirations:
 
-        return InnovationHypothesis(
-            title="Adapt a proven mechanism to the current problem",
-            problem_connection=problem,
-            inspiration_source=(
+            inspiration = (
+                relevant_inspirations[0]
+            )
+
+            inspiration_source = (
+                f"{inspiration.source_type} inspiration: "
+                f"{inspiration.title}"
+            )
+
+            underlying_mechanism = (
+                f"Adapt the mechanism used in "
+                f"'{inspiration.title}': "
+                f"{inspiration.mechanism}"
+            )
+
+            novel_combination = (
+                f"Combine the mechanism from "
+                f"'{inspiration.title}' with the "
+                f"needs, constraints and context of "
+                f"the current problem."
+            )
+
+            why_it_might_work = (
+                f"The observed opportunity suggests that "
+                f"{description} The inspiration source reports "
+                f"the following observed result: "
+                f"{inspiration.observed_result}"
+            )
+
+            if inspiration.adaptation_notes:
+                novel_combination += (
+                    f" Adaptation consideration: "
+                    f"{inspiration.adaptation_notes}"
+                )
+
+            evidence_basis.append(
+                f"Inspiration source: {inspiration.title}"
+            )
+
+            evidence_basis.append(
+                f"Observed result from inspiration: "
+                f"{inspiration.observed_result}"
+            )
+
+            uncertainty.append(
+                "The inspiration source may not transfer "
+                "successfully to the target context."
+            )
+
+            uncertainty.append(
+                "Observed results from another context "
+                "do not establish effectiveness here."
+            )
+
+        else:
+
+            inspiration_source = (
                 "cross-domain transfer from an observed "
                 "innovation opportunity"
-            ),
-            underlying_mechanism=(
-                "Use the mechanism behind the observed pattern "
-                "rather than copying the original intervention "
-                "exactly, and adapt it to the current context."
-            ),
-            novel_combination=(
+            )
+
+            underlying_mechanism = (
+                "Use the mechanism behind the observed "
+                "pattern rather than copying the original "
+                "intervention exactly, and adapt it to the "
+                "current context."
+            )
+
+            novel_combination = (
                 "Combine the observed mechanism with the "
                 "needs and constraints of the current problem."
+            )
+
+            why_it_might_work = (
+                f"The opportunity suggests that "
+                f"{description} may contain a useful "
+                "mechanism that could be adapted to this problem."
+            )
+
+            evidence_basis.append(
+                "No external inspiration source was supplied."
+            )
+
+            uncertainty.append(
+                "The transferred mechanism may not work "
+                "under the same conditions as the original context."
+            )
+
+        return InnovationHypothesis(
+            title=(
+                "Adapt an existing mechanism "
+                "to the current problem"
             ),
-            why_it_might_work=(
-                f"The opportunity suggests that {description} "
-                "may contain a useful mechanism that could be "
-                "adapted to this problem."
-            ),
-            evidence_basis=list(evidence_basis),
+            problem_connection=problem,
+            inspiration_source=inspiration_source,
+            underlying_mechanism=underlying_mechanism,
+            novel_combination=novel_combination,
+            why_it_might_work=why_it_might_work,
+            evidence_basis=evidence_basis,
             confidence=getattr(
                 opportunity,
                 "confidence",
@@ -186,11 +347,14 @@ class InnovationReasoningEngine:
         problem: str,
         opportunity,
     ) -> InnovationHypothesis:
+        """Generate a hypothesis focused on strengthening evidence."""
 
-        evidence_basis = getattr(
-            opportunity,
-            "evidence_basis",
-            [],
+        evidence_basis = list(
+            getattr(
+                opportunity,
+                "evidence_basis",
+                [],
+            )
         )
 
         uncertainty = list(
@@ -207,7 +371,10 @@ class InnovationReasoningEngine:
         )
 
         return InnovationHypothesis(
-            title="Strengthen evidence before designing at scale",
+            title=(
+                "Strengthen evidence before "
+                "designing at scale"
+            ),
             problem_connection=problem,
             inspiration_source=(
                 "evidence-gap analysis"
@@ -228,7 +395,7 @@ class InnovationReasoningEngine:
                 "important barrier, unmet need or difference "
                 "between population groups."
             ),
-            evidence_basis=list(evidence_basis),
+            evidence_basis=evidence_basis,
             confidence="low",
             uncertainty=uncertainty,
             experiment=(
@@ -247,11 +414,14 @@ class InnovationReasoningEngine:
         problem: str,
         opportunity,
     ) -> InnovationHypothesis:
+        """Generate a hypothesis from contradictory evidence."""
 
-        evidence_basis = getattr(
-            opportunity,
-            "evidence_basis",
-            [],
+        evidence_basis = list(
+            getattr(
+                opportunity,
+                "evidence_basis",
+                [],
+            )
         )
 
         uncertainty = list(
@@ -268,16 +438,20 @@ class InnovationReasoningEngine:
         )
 
         return InnovationHypothesis(
-            title="Design for different implementation contexts",
+            title=(
+                "Design for different "
+                "implementation contexts"
+            ),
             problem_connection=problem,
             inspiration_source=(
-                "contradictory evidence across comparable contexts"
+                "contradictory evidence across "
+                "comparable contexts"
             ),
             underlying_mechanism=(
                 "Identify the contextual conditions under which "
                 "an intervention produces different outcomes, "
-                "including population, measurement, location and "
-                "implementation conditions."
+                "including population, measurement, location "
+                "and implementation conditions."
             ),
             novel_combination=(
                 "Combine the intervention with context-specific "
@@ -289,7 +463,7 @@ class InnovationReasoningEngine:
                 "intervention works differently under different "
                 "conditions."
             ),
-            evidence_basis=list(evidence_basis),
+            evidence_basis=evidence_basis,
             confidence="low",
             uncertainty=uncertainty,
             experiment=(
@@ -298,9 +472,9 @@ class InnovationReasoningEngine:
                 "consistent."
             ),
             validation_question=(
-                "Which contextual conditions explain the different "
-                "outcomes, and can the intervention be adapted "
-                "accordingly?"
+                "Which contextual conditions explain the "
+                "different outcomes, and can the intervention "
+                "be adapted accordingly?"
             ),
         )
 
@@ -308,12 +482,22 @@ class InnovationReasoningEngine:
         self,
         problem: str,
         opportunity,
+        relevant_inspirations: Optional[
+            List[InnovationInspiration]
+        ] = None,
     ) -> InnovationHypothesis:
+        """Generate a hypothesis from an identified unmet need."""
 
-        evidence_basis = getattr(
-            opportunity,
-            "evidence_basis",
-            [],
+        relevant_inspirations = (
+            relevant_inspirations or []
+        )
+
+        evidence_basis = list(
+            getattr(
+                opportunity,
+                "evidence_basis",
+                [],
+            )
         )
 
         uncertainty = list(
@@ -324,31 +508,75 @@ class InnovationReasoningEngine:
             )
         )
 
-        uncertainty.append(
-            "The unmet need may have multiple underlying causes."
-        )
+        if relevant_inspirations:
 
-        return InnovationHypothesis(
-            title="Design around the identified unmet need",
-            problem_connection=problem,
-            inspiration_source=(
+            inspiration = (
+                relevant_inspirations[0]
+            )
+
+            inspiration_source = (
+                f"{inspiration.source_type} inspiration: "
+                f"{inspiration.title}"
+            )
+
+            underlying_mechanism = (
+                f"Use and adapt the mechanism from "
+                f"'{inspiration.title}': "
+                f"{inspiration.mechanism}"
+            )
+
+            novel_combination = (
+                f"Combine the identified unmet need with "
+                f"the mechanism from '{inspiration.title}' "
+                "and adapt it to the local context."
+            )
+
+            evidence_basis.append(
+                f"Inspiration source: {inspiration.title}"
+            )
+
+            uncertainty.append(
+                "The inspiration may not transfer successfully "
+                "to the target population."
+            )
+
+        else:
+
+            inspiration_source = (
                 "identified unmet need"
-            ),
-            underlying_mechanism=(
+            )
+
+            underlying_mechanism = (
                 "Address the underlying need directly rather "
                 "than assuming the existing service model is "
                 "the only possible delivery approach."
+            )
+
+            novel_combination = (
+                "Combine community knowledge with an "
+                "alternative service-delivery mechanism."
+            )
+
+        uncertainty.append(
+            "The unmet need may have multiple "
+            "underlying causes."
+        )
+
+        return InnovationHypothesis(
+            title=(
+                "Design around the identified "
+                "unmet need"
             ),
-            novel_combination=(
-                "Combine community knowledge with an alternative "
-                "service-delivery mechanism."
-            ),
+            problem_connection=problem,
+            inspiration_source=inspiration_source,
+            underlying_mechanism=underlying_mechanism,
+            novel_combination=novel_combination,
             why_it_might_work=(
                 "The opportunity suggests that the current "
                 "approach may not fully address the needs of "
                 "the affected population."
             ),
-            evidence_basis=list(evidence_basis),
+            evidence_basis=evidence_basis,
             confidence="exploratory",
             uncertainty=uncertainty,
             experiment=(
@@ -361,3 +589,20 @@ class InnovationReasoningEngine:
                 "produce better engagement or outcomes?"
             ),
         )
+
+    @staticmethod
+    def _validate_inspirations(
+        inspirations: List[InnovationInspiration],
+    ) -> None:
+        """Validate supplied inspiration records."""
+
+        for inspiration in inspirations:
+
+            if not isinstance(
+                inspiration,
+                InnovationInspiration,
+            ):
+                raise TypeError(
+                    "All inspirations must be instances "
+                    "of InnovationInspiration."
+                )
