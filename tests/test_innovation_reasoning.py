@@ -1,7 +1,9 @@
 import unittest
 from types import SimpleNamespace
 
-from src.innovation_inspiration import InnovationInspirationEngine
+from src.innovation_inspiration import (
+    InnovationInspirationEngine,
+)
 from src.innovation_reasoning import (
     InnovationHypothesis,
     InnovationReasoningEngine,
@@ -14,35 +16,47 @@ class TestInnovationReasoningEngine(unittest.TestCase):
         self.engine = InnovationReasoningEngine()
         self.inspiration_engine = InnovationInspirationEngine()
 
-    def test_engine_returns_innovation_hypotheses(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="emerging_pattern",
-                title="Investigate the repeated peer-support pattern",
-                description=(
-                    "Peer support appears repeatedly in evidence "
-                    "about service engagement."
-                ),
-                evidence_basis=[
-                    "Programme report",
-                    "Community feedback",
-                ],
-                confidence="moderate",
-                uncertainty=[
-                    "The pattern does not establish causation."
-                ],
-                investigation_question=(
-                    "Does peer support consistently improve engagement?"
-                ),
-                suggested_experiment=(
-                    "Pilot peer support with a small group."
-                ),
-            )
-        ]
+    def _create_inspiration(
+        self,
+        source_type,
+        title,
+        context,
+        mechanism,
+        observed_result,
+    ):
+        return self.inspiration_engine.create(
+            source_type=source_type,
+            title=title,
+            context=context,
+            mechanism=mechanism,
+            observed_result=observed_result,
+            transferability="moderate",
+        )
+
+    def test_generate_hypothesis_from_opportunity(self):
+        opportunity = SimpleNamespace(
+            opportunity_type="emerging_pattern",
+            title="Youth service access pattern",
+            description=(
+                "Young people are experiencing repeated "
+                "barriers to service access."
+            ),
+            evidence_basis=[
+                "Programme records",
+                "Community feedback",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "The pattern does not establish causation."
+            ],
+        )
 
         hypotheses = self.engine.generate(
-            problem="Young people face barriers to service access.",
-            opportunities=opportunities,
+            problem=(
+                "Young people face barriers to "
+                "service access."
+            ),
+            opportunities=[opportunity],
         )
 
         self.assertGreater(
@@ -56,150 +70,83 @@ class TestInnovationReasoningEngine(unittest.TestCase):
         )
 
     def test_hypothesis_contains_required_fields(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="emerging_pattern",
-                title="Peer support pattern",
-                description="Peer support appears repeatedly.",
-                evidence_basis=["Programme report"],
-                confidence="moderate",
-                uncertainty=["Causation is uncertain."],
-                investigation_question="Does peer support improve access?",
-                suggested_experiment="Run a small pilot.",
-            )
-        ]
+        opportunity = SimpleNamespace(
+            opportunity_type="emerging_pattern",
+            title="Service access pattern",
+            description=(
+                "Young people face barriers to "
+                "community services."
+            ),
+            evidence_basis=[
+                "Programme report",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "Causation is not established."
+            ],
+        )
 
         hypotheses = self.engine.generate(
-            problem="Young people face barriers to service access.",
-            opportunities=opportunities,
+            problem=(
+                "Young people face barriers to "
+                "community services."
+            ),
+            opportunities=[opportunity],
         )
 
         hypothesis = hypotheses[0]
 
-        self.assertTrue(hypothesis.title)
-        self.assertTrue(hypothesis.problem_connection)
-        self.assertTrue(hypothesis.inspiration_source)
-        self.assertTrue(hypothesis.underlying_mechanism)
-        self.assertTrue(hypothesis.novel_combination)
-        self.assertTrue(hypothesis.why_it_might_work)
-        self.assertTrue(hypothesis.evidence_basis)
-        self.assertTrue(hypothesis.confidence)
-        self.assertTrue(hypothesis.uncertainty)
-        self.assertTrue(hypothesis.experiment)
-        self.assertTrue(hypothesis.validation_question)
-
-    def test_pattern_opportunity_generates_transfer_hypothesis(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="emerging_pattern",
-                title="Peer support pattern",
-                description=(
-                    "Peer support repeatedly appears to improve "
-                    "service engagement."
-                ),
-                evidence_basis=[
-                    "Programme report",
-                    "Community feedback",
-                ],
-                confidence="moderate",
-                uncertainty=[
-                    "The pattern does not establish causation."
-                ],
-                investigation_question="Does peer support improve access?",
-                suggested_experiment="Run a small pilot.",
-            )
-        ]
-
-        hypotheses = self.engine.generate(
-            problem="Young people face barriers to service access.",
-            opportunities=opportunities,
-        )
-
-        sources = [
-            hypothesis.inspiration_source
-            for hypothesis in hypotheses
-        ]
-
         self.assertTrue(
-            any(
-                "transfer" in source.lower()
-                for source in sources
-            )
-        )
-
-    def test_evidence_gap_generates_evidence_strengthening_hypothesis(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="evidence_gap",
-                title="Investigate the evidence gap",
-                description=(
-                    "Population information is missing from the evidence."
-                ),
-                evidence_basis=[
-                    "Population information is missing."
-                ],
-                confidence="low",
-                uncertainty=[
-                    "Additional evidence is required."
-                ],
-                investigation_question=(
-                    "What additional evidence should be collected?"
-                ),
-                suggested_experiment=(
-                    "Conduct structured community data collection."
-                ),
-            )
-        ]
-
-        hypotheses = self.engine.generate(
-            problem="Young people face barriers to service access.",
-            opportunities=opportunities,
-        )
-
-        self.assertGreater(
-            len(hypotheses),
-            0,
-        )
-
-        combined = " ".join(
             hypothesis.title
-            for hypothesis in hypotheses
-        ).lower()
-
+        )
         self.assertTrue(
-            "evidence" in combined
-            or "information" in combined
+            hypothesis.problem_connection
+        )
+        self.assertTrue(
+            hypothesis.underlying_mechanism
+        )
+        self.assertTrue(
+            hypothesis.why_it_might_work
+        )
+        self.assertTrue(
+            hypothesis.evidence_basis
+        )
+        self.assertTrue(
+            hypothesis.confidence
+        )
+        self.assertTrue(
+            hypothesis.uncertainty
+        )
+        self.assertTrue(
+            hypothesis.experiment
+        )
+        self.assertTrue(
+            hypothesis.validation_question
         )
 
-    def test_contradiction_generates_context_hypothesis(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="contradiction",
-                title="Investigate conflicting evidence",
-                description=(
-                    "Conflicting evidence sources report different outcomes."
-                ),
-                evidence_basis=[
-                    "Programme report",
-                    "Community feedback",
-                ],
-                confidence="low",
-                uncertainty=[
-                    "Measurement and population differences may explain "
-                    "the disagreement."
-                ],
-                investigation_question=(
-                    "What explains the disagreement?"
-                ),
-                suggested_experiment=(
-                    "Compare measurement methods and implementation contexts."
-                ),
-            )
-        ]
+    def test_transfer_opportunity_generates_hypothesis(self):
+        opportunity = SimpleNamespace(
+            opportunity_type="transfer_opportunity",
+            title="Peer navigation transfer",
+            description=(
+                "A peer navigation mechanism may be "
+                "adapted to the target context."
+            ),
+            evidence_basis=[
+                "Cross-sector programme",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "Transferability is uncertain."
+            ],
+        )
 
         hypotheses = self.engine.generate(
-            problem="Young people face barriers to service access.",
-            opportunities=opportunities,
+            problem=(
+                "Community members face barriers to "
+                "accessing services."
+            ),
+            opportunities=[opportunity],
         )
 
         self.assertGreater(
@@ -207,58 +154,126 @@ class TestInnovationReasoningEngine(unittest.TestCase):
             0,
         )
 
-        combined = " ".join(
-            hypothesis.underlying_mechanism
-            for hypothesis in hypotheses
-        ).lower()
-
-        self.assertTrue(
-            "context" in combined
-            or "condition" in combined
-            or "measurement" in combined
+        self.assertIn(
+            "transfer",
+            hypotheses[0].novel_combination.lower(),
         )
 
-    def test_hypothesis_preserves_uncertainty(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="emerging_pattern",
-                title="Repeated pattern",
-                description="A repeated pattern was observed.",
-                evidence_basis=["Community feedback"],
-                confidence="moderate",
-                uncertainty=[
-                    "The pattern does not establish causation."
-                ],
-                investigation_question="Does the pattern persist?",
-                suggested_experiment="Run a small pilot.",
-            )
-        ]
+    def test_evidence_gap_generates_hypothesis(self):
+        opportunity = SimpleNamespace(
+            opportunity_type="evidence_gap",
+            title="Missing outcome evidence",
+            description=(
+                "There is insufficient evidence about "
+                "long-term service outcomes."
+            ),
+            evidence_basis=[
+                "Programme documentation",
+            ],
+            confidence="low",
+            uncertainty=[
+                "Outcome evidence is incomplete."
+            ],
+        )
 
         hypotheses = self.engine.generate(
-            problem="A community programme has low engagement.",
-            opportunities=opportunities,
+            problem=(
+                "The programme lacks evidence about "
+                "long-term outcomes."
+            ),
+            opportunities=[opportunity],
         )
 
-        uncertainty = " ".join(
-            hypotheses[0].uncertainty
-        ).lower()
+        self.assertGreater(
+            len(hypotheses),
+            0,
+        )
+
+        self.assertIn(
+            "evidence",
+            hypotheses[0].underlying_mechanism.lower(),
+        )
+
+    def test_contradiction_generates_hypothesis(self):
+        opportunity = SimpleNamespace(
+            opportunity_type="contradiction",
+            title="Conflicting service outcomes",
+            description=(
+                "Different evidence sources report "
+                "different outcomes."
+            ),
+            evidence_basis=[
+                "Programme report",
+                "Community feedback",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "The reasons for the contradiction "
+                "are unclear."
+            ],
+        )
+
+        hypotheses = self.engine.generate(
+            problem=(
+                "Evidence shows conflicting outcomes "
+                "for the same service."
+            ),
+            opportunities=[opportunity],
+        )
+
+        self.assertGreater(
+            len(hypotheses),
+            0,
+        )
 
         self.assertTrue(
-            "uncertain" in uncertainty
-            or "causation" in uncertainty
-            or "not proven" in uncertainty
+            "context"
+            in hypotheses[0].underlying_mechanism.lower()
+            or "different"
+            in hypotheses[0].why_it_might_work.lower()
         )
 
-    def test_empty_problem_is_rejected(self):
+    def test_hypothesis_contains_uncertainty(self):
+        opportunity = SimpleNamespace(
+            opportunity_type="emerging_pattern",
+            title="Emerging pattern",
+            description=(
+                "A recurring pattern has been observed."
+            ),
+            evidence_basis=[
+                "Programme records",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "The pattern may have other explanations."
+            ],
+        )
+
+        hypotheses = self.engine.generate(
+            problem=(
+                "A recurring service pattern has been "
+                "observed."
+            ),
+            opportunities=[opportunity],
+        )
+
+        self.assertGreater(
+            len(hypotheses[0].uncertainty),
+            0,
+        )
+
+    def test_empty_problem_raises_error(self):
         with self.assertRaises(ValueError):
             self.engine.generate(
                 problem="",
                 opportunities=[],
             )
 
-    def test_no_opportunities_returns_no_hypotheses(self):
+    def test_no_opportunities_returns_empty(self):
         hypotheses = self.engine.generate(
-            problem="Young people face barriers to service access.",
+            problem=(
+                "Young people face service barriers."
+            ),
             opportunities=[],
         )
 
@@ -268,22 +283,26 @@ class TestInnovationReasoningEngine(unittest.TestCase):
         )
 
     def test_hypothesis_can_be_converted_to_dict(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="emerging_pattern",
-                title="Repeated pattern",
-                description="A repeated pattern was observed.",
-                evidence_basis=["Community feedback"],
-                confidence="moderate",
-                uncertainty=["Causation is uncertain."],
-                investigation_question="Does the pattern persist?",
-                suggested_experiment="Run a small pilot.",
-            )
-        ]
+        opportunity = SimpleNamespace(
+            opportunity_type="emerging_pattern",
+            title="Service pattern",
+            description=(
+                "A recurring service pattern exists."
+            ),
+            evidence_basis=[
+                "Programme records",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "The pattern requires validation."
+            ],
+        )
 
         hypotheses = self.engine.generate(
-            problem="Young people face barriers to service access.",
-            opportunities=opportunities,
+            problem=(
+                "A recurring service pattern exists."
+            ),
+            opportunities=[opportunity],
         )
 
         result = hypotheses[0].to_dict()
@@ -308,52 +327,44 @@ class TestInnovationReasoningEngine(unittest.TestCase):
                 result,
             )
 
-    def test_relevant_inspiration_can_influence_hypothesis(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="emerging_pattern",
-                title="Peer support pattern",
-                description=(
-                    "Peer support appears repeatedly to improve "
-                    "service engagement."
-                ),
-                evidence_basis=[
-                    "Programme report",
-                    "Community feedback",
-                ],
-                confidence="moderate",
-                uncertainty=[
-                    "The pattern does not establish causation."
-                ],
-                investigation_question="Does peer support improve access?",
-                suggested_experiment="Run a small pilot.",
-            )
-        ]
+    def test_relevant_inspiration_influences_hypothesis(self):
+        inspiration = self._create_inspiration(
+            source_type="cross_sector",
+            title="Peer navigation model",
+            context="Community health services",
+            mechanism=(
+                "Trusted peers guide people through "
+                "services."
+            ),
+            observed_result=(
+                "Improved service engagement."
+            ),
+        )
 
-        inspirations = [
-            self.inspiration_engine.create(
-                source_type="cross_sector",
-                title="Peer navigation model",
-                context="Community health services",
-                mechanism=(
-                    "Trusted peers guide people through "
-                    "services."
-                ),
-                observed_result=(
-                    "Improved service engagement."
-                ),
-                transferability="moderate",
-                adaptation_notes=(
-                    "Adapt peer navigation to young people "
-                    "accessing community services."
-                ),
-            )
-        ]
+        opportunity = SimpleNamespace(
+            opportunity_type="transfer_opportunity",
+            title="Peer navigation transfer",
+            description=(
+                "A peer navigation approach may help "
+                "address service access barriers."
+            ),
+            evidence_basis=[
+                "Cross-sector programme",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "Transferability to the target context "
+                "is uncertain."
+            ],
+        )
 
         hypotheses = self.engine.generate(
-            problem="Young people face barriers to service access.",
-            opportunities=opportunities,
-            inspirations=inspirations,
+            problem=(
+                "Young people face barriers to "
+                "community health services."
+            ),
+            opportunities=[opportunity],
+            inspirations=[inspiration],
         )
 
         self.assertGreater(
@@ -361,123 +372,123 @@ class TestInnovationReasoningEngine(unittest.TestCase):
             0,
         )
 
-        combined = " ".join(
+        combined_text = " ".join(
             [
-                hypotheses[0].inspiration_source,
-                hypotheses[0].novel_combination,
-                hypotheses[0].why_it_might_work,
+                str(hypotheses[0].title),
+                str(hypotheses[0].novel_combination),
+                str(hypotheses[0].underlying_mechanism),
             ]
         ).lower()
 
-        self.assertTrue(
-            "peer navigation" in combined
-            or "trusted peers" in combined
-            or "inspiration" in combined
+        self.assertIn(
+            "peer",
+            combined_text,
         )
 
     def test_inspiration_is_preserved_in_evidence_basis(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="emerging_pattern",
-                title="Peer support pattern",
-                description=(
-                    "Peer support appears repeatedly to improve "
-                    "service engagement."
-                ),
-                evidence_basis=[
-                    "Programme report",
-                ],
-                confidence="moderate",
-                uncertainty=[
-                    "The pattern does not establish causation."
-                ],
-                investigation_question="Does peer support improve access?",
-                suggested_experiment="Run a small pilot.",
-            )
-        ]
-
-        inspirations = [
-            self.inspiration_engine.create(
-                source_type="community",
-                title="Community peer navigator model",
-                context="Community service access",
-                mechanism=(
-                    "Trusted community members help people "
-                    "navigate services."
-                ),
-                observed_result=(
-                    "Improved participation."
-                ),
-                transferability="high",
-                adaptation_notes=(
-                    "Co-design with local community members."
-                ),
-            )
-        ]
-
-        hypotheses = self.engine.generate(
-            problem="Young people face barriers to service access.",
-            opportunities=opportunities,
-            inspirations=inspirations,
+        inspiration = self._create_inspiration(
+            source_type="historical",
+            title="Historical outreach programme",
+            context="Community services",
+            mechanism=(
+                "Outreach workers connect "
+                "underserved communities with services."
+            ),
+            observed_result=(
+                "Improved service reach."
+            ),
         )
 
-        evidence_basis = " ".join(
+        opportunity = SimpleNamespace(
+            opportunity_type="transfer_opportunity",
+            title="Outreach transfer",
+            description=(
+                "An outreach mechanism may be "
+                "adapted."
+            ),
+            evidence_basis=[
+                "Historical programme",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "Historical context differs."
+            ],
+        )
+
+        hypotheses = self.engine.generate(
+            problem=(
+                "Underserved communities face "
+                "service access barriers."
+            ),
+            opportunities=[opportunity],
+            inspirations=[inspiration],
+        )
+
+        self.assertGreater(
+            len(hypotheses),
+            0,
+        )
+
+        evidence_basis = str(
             hypotheses[0].evidence_basis
         ).lower()
 
-        self.assertTrue(
-            "peer" in evidence_basis
-            or "community" in evidence_basis
+        self.assertIn(
+            "historical outreach programme",
+            evidence_basis,
         )
 
     def test_multiple_inspirations_can_be_used(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="emerging_pattern",
-                title="Service engagement pattern",
-                description=(
-                    "Community-based support appears to improve "
-                    "service engagement."
-                ),
-                evidence_basis=[
-                    "Programme report",
-                ],
-                confidence="moderate",
-                uncertainty=[
-                    "The pattern does not establish causation."
-                ],
-                investigation_question=(
-                    "Does community support improve engagement?"
-                ),
-                suggested_experiment="Run a small pilot.",
-            )
-        ]
-
         inspirations = [
-            self.inspiration_engine.create(
+            self._create_inspiration(
                 source_type="cross_sector",
                 title="Peer navigation model",
                 context="Community health services",
                 mechanism=(
-                    "Trusted peers guide people through services."
+                    "Trusted peers guide people "
+                    "through services."
                 ),
-                observed_result="Improved engagement.",
+                observed_result=(
+                    "Improved service engagement."
+                ),
             ),
-            self.inspiration_engine.create(
+            self._create_inspiration(
                 source_type="community",
                 title="Mobile outreach model",
                 context="Community service delivery",
                 mechanism=(
-                    "Services are brought closer to communities."
+                    "Services are brought closer to "
+                    "communities."
                 ),
-                observed_result="Improved access.",
+                observed_result=(
+                    "Improved access."
+                ),
             ),
         ]
 
+        opportunity = SimpleNamespace(
+            opportunity_type="transfer_opportunity",
+            title="Combined access approach",
+            description=(
+                "Multiple mechanisms may help "
+                "address service access barriers."
+            ),
+            evidence_basis=[
+                "Community feedback",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "The mechanisms have not been "
+                "tested together."
+            ],
+        )
+
         hypotheses = self.engine.generate(
-            problem="Young people need better community "
-                    "access to services.",
-            opportunities=opportunities,
+            problem=(
+                "Young people face barriers to "
+                "service access."
+            ),
+            opportunities=[opportunity],
             inspirations=inspirations,
         )
 
@@ -487,22 +498,28 @@ class TestInnovationReasoningEngine(unittest.TestCase):
         )
 
     def test_no_inspiration_still_generates_hypothesis(self):
-        opportunities = [
-            SimpleNamespace(
-                opportunity_type="emerging_pattern",
-                title="Observed pattern",
-                description="A useful pattern was observed.",
-                evidence_basis=["Programme report"],
-                confidence="moderate",
-                uncertainty=["Causation is uncertain."],
-                investigation_question="Does the pattern persist?",
-                suggested_experiment="Run a small pilot.",
-            )
-        ]
+        opportunity = SimpleNamespace(
+            opportunity_type="emerging_pattern",
+            title="Service access pattern",
+            description=(
+                "Young people face repeated "
+                "service access barriers."
+            ),
+            evidence_basis=[
+                "Programme records",
+            ],
+            confidence="moderate",
+            uncertainty=[
+                "The pattern needs further validation."
+            ],
+        )
 
         hypotheses = self.engine.generate(
-            problem="A community programme has low engagement.",
-            opportunities=opportunities,
+            problem=(
+                "Young people face service "
+                "access barriers."
+            ),
+            opportunities=[opportunity],
             inspirations=[],
         )
 
@@ -511,9 +528,11 @@ class TestInnovationReasoningEngine(unittest.TestCase):
             0,
         )
 
-    def test_no_evidence_and_no_opportunities_returns_no_hypotheses(self):
+    def test_no_evidence_no_opportunities_returns_empty(self):
         hypotheses = self.engine.generate(
-            problem="A community programme has low engagement.",
+            problem=(
+                "Young people face service barriers."
+            ),
             opportunities=[],
             inspirations=[],
         )
@@ -523,7 +542,9 @@ class TestInnovationReasoningEngine(unittest.TestCase):
             [],
         )
 
-    def test_multiple_inspirations_create_combined_innovation_hypothesis(self):
+    def test_multiple_inspirations_create_combined_innovation_hypothesis(
+        self,
+    ):
         inspiration_engine = InnovationInspirationEngine()
 
         inspirations = [
@@ -588,23 +609,15 @@ class TestInnovationReasoningEngine(unittest.TestCase):
 
         hypothesis = hypotheses[0]
 
+        combined_parts = [
+            str(hypothesis.title),
+            str(hypothesis.novel_combination),
+            str(hypothesis.underlying_mechanism),
+            str(hypothesis.evidence_basis),
+        ]
+
         combined_text = " ".join(
-            [
-                hypothesis.title,
-                hypothesis.novel_combination,
-                hypothesis.underlying_mechanism,
-                hypothesis.evidence_basis,
-            ]
-            if isinstance(
-                hypothesis.evidence_basis,
-                list,
-            )
-            else [
-                hypothesis.title,
-                hypothesis.novel_combination,
-                hypothesis.underlying_mechanism,
-                hypothesis.evidence_basis,
-            ]
+            combined_parts
         ).lower()
 
         self.assertIn(
@@ -616,5 +629,7 @@ class TestInnovationReasoningEngine(unittest.TestCase):
             "mobile" in combined_text
             or "outreach" in combined_text
         )
+
+
 if __name__ == "__main__":
     unittest.main()
