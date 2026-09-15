@@ -1,7 +1,7 @@
 """
 OpenSocial AI – Innovation Discovery Engine
 
-Version 4.5
+Version 5.0
 
 Combines:
 - a problem description
@@ -12,6 +12,8 @@ Combines:
 - evidence conflict detection
 - evidence-grounded insight generation
 - innovation opportunity detection
+- innovation reasoning
+- innovation hypothesis generation
 
 The engine remains model-independent and transparent.
 
@@ -26,55 +28,79 @@ from typing import Dict, List, Optional
 
 try:
     from src.evidence import EvidenceItem
+
     from src.pattern_discovery import (
         PatternDiscovery,
         ObservedPattern,
     )
+
     from src.evidence_gap import (
         EvidenceGapAnalysis,
         EvidenceGap,
     )
+
     from src.evidence_quality import (
         EvidenceQualityAssessor,
         EvidenceQuality,
     )
+
     from src.evidence_conflict import (
         EvidenceConflictDetector,
         EvidenceConflict,
     )
+
     from src.insight_generation import (
         InsightGenerator,
         InsightCandidate,
     )
+
     from src.innovation_opportunity import (
         InnovationOpportunityDetector,
         InnovationOpportunity,
     )
+
+    from src.innovation_reasoning import (
+        InnovationReasoningEngine,
+        InnovationHypothesis,
+    )
+
 except ModuleNotFoundError:
+
     from evidence import EvidenceItem
+
     from pattern_discovery import (
         PatternDiscovery,
         ObservedPattern,
     )
+
     from evidence_gap import (
         EvidenceGapAnalysis,
         EvidenceGap,
     )
+
     from evidence_quality import (
         EvidenceQualityAssessor,
         EvidenceQuality,
     )
+
     from evidence_conflict import (
         EvidenceConflictDetector,
         EvidenceConflict,
     )
+
     from insight_generation import (
         InsightGenerator,
         InsightCandidate,
     )
+
     from innovation_opportunity import (
         InnovationOpportunityDetector,
         InnovationOpportunity,
+    )
+
+    from innovation_reasoning import (
+        InnovationReasoningEngine,
+        InnovationHypothesis,
     )
 
 
@@ -134,6 +160,10 @@ class InnovationReport:
         default_factory=list
     )
 
+    innovation_hypotheses: List[InnovationHypothesis] = field(
+        default_factory=list
+    )
+
     def to_dict(self) -> Dict:
         """Return the complete report as a dictionary."""
 
@@ -168,6 +198,10 @@ class InnovationDiscoveryEngine:
            ↓
         Innovation Opportunity Detection
            ↓
+        Innovation Reasoning
+           ↓
+        Innovation Hypotheses
+           ↓
         Innovation Report
     """
 
@@ -196,6 +230,10 @@ class InnovationDiscoveryEngine:
             InnovationOpportunityDetector()
         )
 
+        self.innovation_reasoning_engine = (
+            InnovationReasoningEngine()
+        )
+
     def analyse(
         self,
         problem: str,
@@ -207,8 +245,9 @@ class InnovationDiscoveryEngine:
         Evidence is validated, quality-assessed, profiled,
         patterns are discovered, potential conflicts are
         identified, evidence gaps are analysed, insights are
-        generated, and innovation opportunities are identified
-        before the final report is created.
+        generated, innovation opportunities are identified,
+        and innovation hypotheses are generated before the
+        final report is created.
         """
 
         if not problem or not problem.strip():
@@ -299,6 +338,7 @@ class InnovationDiscoveryEngine:
                     "Why do any conflicting evidence sources report different outcomes?",
                 ]
             )
+
         else:
             key_questions.append(
                 "What evidence should be collected before testing a solution?"
@@ -385,6 +425,16 @@ class InnovationDiscoveryEngine:
             )
         )
 
+        innovation_hypotheses = []
+
+        if evidence:
+            innovation_hypotheses = (
+                self.innovation_reasoning_engine.generate(
+                    problem=problem,
+                    opportunities=innovation_opportunities,
+                )
+            )
+
         validation_questions = [
             "Do community members recognise this problem and its causes?",
             "What evidence supports each proposed explanation?",
@@ -421,6 +471,17 @@ class InnovationDiscoveryEngine:
                 ]
             )
 
+        if innovation_hypotheses:
+            validation_questions.extend(
+                [
+                    "Which innovation hypothesis has the strongest evidence basis?",
+                    "Which innovation hypothesis should be tested first?",
+                    "What assumptions must be tested before investing resources?",
+                    "What evidence would confirm or challenge the innovation hypothesis?",
+                    "What would make us stop, adapt or scale the innovation experiment?",
+                ]
+            )
+
         return InnovationReport(
             problem=problem,
             reframed_problem=reframed_problem,
@@ -437,6 +498,7 @@ class InnovationDiscoveryEngine:
             evidence_conflicts=evidence_conflicts,
             insights=insights,
             innovation_opportunities=innovation_opportunities,
+            innovation_hypotheses=innovation_hypotheses,
         )
 
     @staticmethod
@@ -648,6 +710,40 @@ if __name__ == "__main__":
         print(
             f"  Experiment: "
             f"{opportunity.suggested_experiment}"
+        )
+
+    print("\nInnovation Hypotheses:")
+    for hypothesis in report.innovation_hypotheses:
+        print(
+            f"- {hypothesis.title}"
+        )
+        print(
+            f"  Inspiration: "
+            f"{hypothesis.inspiration_source}"
+        )
+        print(
+            f"  Mechanism: "
+            f"{hypothesis.underlying_mechanism}"
+        )
+        print(
+            f"  Novel Combination: "
+            f"{hypothesis.novel_combination}"
+        )
+        print(
+            f"  Why It Might Work: "
+            f"{hypothesis.why_it_might_work}"
+        )
+        print(
+            f"  Confidence: "
+            f"{hypothesis.confidence}"
+        )
+        print(
+            f"  Experiment: "
+            f"{hypothesis.experiment}"
+        )
+        print(
+            f"  Validate: "
+            f"{hypothesis.validation_question}"
         )
 
     print("\nSolution Hypotheses:")
