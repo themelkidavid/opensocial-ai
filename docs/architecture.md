@@ -86,6 +86,7 @@ following pipeline:
 | Inspiration | `innovation_inspiration.py` | `InnovationInspiration` |
 | Inspiration retrieval | `retrieval.py` | Keyword, optional semantic, or optional hybrid matches from the supplied inspiration corpus |
 | Cross-sector discovery | `cross_sector_discovery.py` | Mechanism-based candidate inspirations with adaptation questions |
+| Historical memory | `historical_memory.py` | Optional persisted programme precedents and retrievable mechanisms |
 | Reasoning and combination | `innovation_reasoning.py`, `innovation_combination.py` | `InnovationHypothesis` |
 | Experiment design | `experiment_design.py` | `ExperimentDesign` |
 | Validation and learning | `validation_learning.py` | `ValidationObservation`, `ValidatedLearning` |

@@ -252,3 +252,11 @@ transferability status, uncertainty, and questions for human adaptation
 review. These questions are prompts for investigation, not conclusions or
 approval to act. Evidence gaps, contradictions, community oversight, and
 bounded testing safeguards continue to take priority.
+
+## Historical programme memory
+
+Stored historical programmes are evidence-bearing precedents, not universal
+knowledge. A past result is not causal proof; historical similarity is not
+contextual equivalence; and a repeated mechanism is not guaranteed to work.
+Provenance, evidence basis, limitations, reviewer-attributed learning, and
+human/community judgment remain necessary before adaptation or testing.

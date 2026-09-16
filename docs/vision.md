@@ -98,3 +98,6 @@ Cross-sector discovery can broaden the set of candidate mechanisms that
 communities and practitioners investigate. It should support learning across
 contexts without erasing local knowledge: transfer remains exploratory,
 adaptation is required, and decisions remain with people and communities.
+
+Historical programme memory can retain documented precedents and learning
+without mistaking organisational records for universal truth.

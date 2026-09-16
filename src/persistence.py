@@ -26,6 +26,7 @@ try:
         ValidationLearningEngine,
         ValidationObservation,
     )
+    from src.historical_memory import HistoricalProgramme, MechanismRecord
 except ModuleNotFoundError:
     from evidence import EvidenceItem, create_evidence
     from experiment_design import ExperimentDesign
@@ -34,6 +35,7 @@ except ModuleNotFoundError:
         ValidationLearningEngine,
         ValidationObservation,
     )
+    from historical_memory import HistoricalProgramme, MechanismRecord
 
 
 @dataclass
@@ -939,6 +941,49 @@ class SQLiteLearningRepository:
             raise ValueError("learning reviewer does not match observation")
 
 
+class SQLiteHistoricalRepository:
+    """Main-store repository for historical programmes and mechanisms."""
+    def __init__(self, connection, audit_events, learning):
+        self._connection, self._audit_events, self._learning = connection, audit_events, learning
+    def save_programme(self, programme):
+        if not isinstance(programme, HistoricalProgramme): raise TypeError("programme must be HistoricalProgramme")
+        payload=programme.to_dict(); programme_id=programme.programme_id or _stable_id("programme", payload); payload["programme_id"]=programme_id
+        with _write_transaction(self._connection):
+            row=self._connection.execute("SELECT payload_json, created_at FROM historical_programmes WHERE programme_id=?",(programme_id,)).fetchone()
+            if row: return HistoricalProgramme(**_load_mapping(row["payload_json"]))
+            self._connection.execute("INSERT INTO historical_programmes VALUES (?,?,?)",(programme_id,_dump_json(payload),_timestamp()))
+            self._audit_events._record("historical_programme_imported","historical_programme",programme_id,"Historical programme metadata was stored; this does not establish effectiveness.",{"source_id":programme.provenance_source_id})
+        return HistoricalProgramme(**payload)
+    def get_programme(self, programme_id):
+        row=self._connection.execute("SELECT payload_json FROM historical_programmes WHERE programme_id=?",(programme_id,)).fetchone()
+        return HistoricalProgramme(**_load_mapping(row["payload_json"])) if row else None
+    def list_programmes(self):
+        return [self.get_programme(row["programme_id"]) for row in self._connection.execute("SELECT programme_id FROM historical_programmes ORDER BY created_at")]
+    def save_mechanism(self, mechanism):
+        if not isinstance(mechanism, MechanismRecord): raise TypeError("mechanism must be MechanismRecord")
+        payload=mechanism.to_dict(); mechanism_id=mechanism.mechanism_id or _stable_id("mechanism", payload); payload["mechanism_id"]=mechanism_id
+        with _write_transaction(self._connection):
+            row=self._connection.execute("SELECT payload_json FROM mechanism_records WHERE mechanism_id=?",(mechanism_id,)).fetchone()
+            if row: return MechanismRecord(**_load_mapping(row["payload_json"]))
+            for programme_id in mechanism.source_programme_ids:
+                if self.get_programme(programme_id) is None: raise ValueError(f"Unknown historical programme_id: {programme_id}")
+            self._connection.execute("INSERT INTO mechanism_records VALUES (?,?,?)",(mechanism_id,_dump_json(payload),_timestamp()))
+            for programme_id in mechanism.source_programme_ids: self._connection.execute("INSERT INTO programme_mechanisms VALUES (?,?)",(programme_id,mechanism_id))
+            self._audit_events._record("mechanism_stored","mechanism",mechanism_id,"Mechanism metadata was stored as a candidate record.",{"programme_ids":mechanism.source_programme_ids})
+        return MechanismRecord(**payload)
+    def get_mechanism(self, mechanism_id):
+        row=self._connection.execute("SELECT payload_json FROM mechanism_records WHERE mechanism_id=?",(mechanism_id,)).fetchone()
+        return MechanismRecord(**_load_mapping(row["payload_json"])) if row else None
+    def list_mechanisms(self): return [self.get_mechanism(row["mechanism_id"]) for row in self._connection.execute("SELECT mechanism_id FROM mechanism_records")]
+    def link_learning(self, programme_id, mechanism_id, learning_id):
+        if self.get_programme(programme_id) is None: raise ValueError("Unknown historical programme_id")
+        if mechanism_id is not None and self.get_mechanism(mechanism_id) is None: raise ValueError("Unknown mechanism_id")
+        if self._learning.get_learning(learning_id) is None: raise ValueError("Unknown learning_id")
+        with _write_transaction(self._connection):
+            self._connection.execute("INSERT OR IGNORE INTO historical_learning_links VALUES (?,?,?)",(programme_id,mechanism_id,learning_id))
+            self._audit_events._record("historical_learning_linked","historical_programme",programme_id,"Exploratory learning was linked to a historical record.",{"mechanism_id":mechanism_id,"learning_id":learning_id})
+
+
 class SQLitePersistenceStore(PersistenceStore):
     """Optional SQLite implementation of the persistence-store interface."""
 
@@ -965,6 +1010,9 @@ class SQLitePersistenceStore(PersistenceStore):
             self._connection,
             self.experiments,
             self.audit_events,
+        )
+        self.historical = SQLiteHistoricalRepository(
+            self._connection, self.audit_events, self.learning
         )
 
     def save_evidence(
@@ -1000,6 +1048,12 @@ class SQLitePersistenceStore(PersistenceStore):
         """Persist learning through the storage interface."""
 
         return self.learning.save_learning(learning, observation_id)
+
+    def save_historical_programme(self, programme: HistoricalProgramme):
+        return self.historical.save_programme(programme)
+
+    def save_mechanism(self, mechanism: MechanismRecord):
+        return self.historical.save_mechanism(mechanism)
 
     @contextmanager
     def transaction(self):
@@ -1138,6 +1192,27 @@ class SQLitePersistenceStore(PersistenceStore):
                     timestamp TEXT NOT NULL,
                     description TEXT NOT NULL,
                     metadata_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS historical_programmes (
+                    programme_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS mechanism_records (
+                    mechanism_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS programme_mechanisms (
+                    programme_id TEXT NOT NULL, mechanism_id TEXT NOT NULL,
+                    PRIMARY KEY (programme_id, mechanism_id),
+                    FOREIGN KEY (programme_id) REFERENCES historical_programmes(programme_id),
+                    FOREIGN KEY (mechanism_id) REFERENCES mechanism_records(mechanism_id)
+                );
+                CREATE TABLE IF NOT EXISTS historical_learning_links (
+                    programme_id TEXT NOT NULL, mechanism_id TEXT, learning_id TEXT NOT NULL,
+                    PRIMARY KEY (programme_id, mechanism_id, learning_id),
+                    FOREIGN KEY (programme_id) REFERENCES historical_programmes(programme_id),
+                    FOREIGN KEY (mechanism_id) REFERENCES mechanism_records(mechanism_id),
+                    FOREIGN KEY (learning_id) REFERENCES learning_records(learning_id)
                 );
                 """
             )

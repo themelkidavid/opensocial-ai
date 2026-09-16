@@ -47,6 +47,7 @@ try:
     )
     from src.retrieval import RelevanceRetriever
     from src.cross_sector_discovery import CrossSectorCandidate
+    from src.historical_memory import HistoricalProgrammeCandidate
 except ModuleNotFoundError:
     from innovation_combination import (
         InnovationCombination,
@@ -58,6 +59,7 @@ except ModuleNotFoundError:
     )
     from retrieval import RelevanceRetriever
     from cross_sector_discovery import CrossSectorCandidate
+    from historical_memory import HistoricalProgrammeCandidate
 
 
 @dataclass
@@ -113,6 +115,7 @@ class InnovationReasoningEngine:
         cross_sector_candidates: Optional[
             List[CrossSectorCandidate]
         ] = None,
+        historical_programme_candidates: Optional[List[HistoricalProgrammeCandidate]] = None,
     ) -> List[InnovationHypothesis]:
         """
         Generate innovation hypotheses.
@@ -132,6 +135,7 @@ class InnovationReasoningEngine:
         opportunities = opportunities or []
         inspirations = inspirations or []
         cross_sector_candidates = cross_sector_candidates or []
+        historical_programme_candidates = historical_programme_candidates or []
 
         if not opportunities:
             return []
@@ -144,6 +148,19 @@ class InnovationReasoningEngine:
         for candidate in cross_sector_candidates:
             if not any(candidate.inspiration is item for item in inspirations):
                 inspirations.append(candidate.inspiration)
+        for candidate in historical_programme_candidates:
+            if not isinstance(candidate, HistoricalProgrammeCandidate):
+                raise TypeError("Historical candidates must be HistoricalProgrammeCandidate instances.")
+            programme = candidate.programme
+            inspiration = InnovationInspiration(
+                source_type="historical", title=programme.title,
+                context=programme.geography or "unknown context", mechanism=programme.mechanism,
+                observed_result="; ".join(programme.observed_results) or "No observed result recorded.",
+                transferability=programme.transferability, sector=programme.sector,
+                target_population=programme.target_population,
+                provenance_source_id=programme.programme_id,
+            )
+            if not any(inspiration.title == item.title and inspiration.mechanism == item.mechanism for item in inspirations): inspirations.append(inspiration)
 
         relevant_inspirations = []
 

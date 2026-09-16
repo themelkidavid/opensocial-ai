@@ -263,6 +263,14 @@ candidates remain visible. Every result includes adaptation questions and
 uncertainty: sector difference and retrieval similarity do not establish
 transferability or effectiveness.
 
+### Historical programme memory
+
+`HistoricalProgrammeIngestion`, `HistoricalMemoryStore`, and
+`HistoricalDiscoveryEngine` provide an optional local record of documented
+programmes and their mechanisms. Historical matches are candidate precedents
+with provenance, evidence basis, limitations, and adaptation questions—not
+proof that a past result transfers to a current context.
+
 When two or more sources are relevant and an innovation or transfer
 opportunity has a sufficient evidence basis, `InnovationCombinationEngine`
 can create a pairwise design hypothesis that preserves both mechanisms and
