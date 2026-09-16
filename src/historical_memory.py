@@ -23,6 +23,7 @@ class HistoricalProgramme:
     activities: List[str] = field(default_factory=list)
     observed_results: List[str] = field(default_factory=list)
     evidence_basis: List[str] = field(default_factory=list)
+    outcome_metrics: List[Dict] = field(default_factory=list)
     source_type: str = "historical"
     provenance_source_id: Optional[str] = None
     provenance_reference: Optional[str] = None
@@ -46,6 +47,7 @@ class MechanismRecord:
     contexts_seen: List[str] = field(default_factory=list)
     observed_results: List[str] = field(default_factory=list)
     evidence_basis: List[str] = field(default_factory=list)
+    outcome_metrics: List[Dict] = field(default_factory=list)
     uncertainty: List[str] = field(default_factory=list)
     provenance: Optional[str] = None
     def to_dict(self): return asdict(self)

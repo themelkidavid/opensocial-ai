@@ -101,3 +101,7 @@ adaptation is required, and decisions remain with people and communities.
 
 Historical programme memory can retain documented precedents and learning
 without mistaking organisational records for universal truth.
+
+Outcome metrics make pilot measurement more explicit while retaining this
+distinction: recorded changes and comparisons are inputs to human learning,
+not automatic proof of causal effectiveness or a universal best approach.

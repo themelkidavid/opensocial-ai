@@ -89,6 +89,7 @@ following pipeline:
 | Historical memory | `historical_memory.py` | Optional persisted programme precedents and retrievable mechanisms |
 | Reasoning and combination | `innovation_reasoning.py`, `innovation_combination.py` | `InnovationHypothesis` |
 | Experiment design | `experiment_design.py` | `ExperimentDesign` |
+| Outcome measurement | `outcome_metrics.py` | Caller-defined metrics, reviewed observations, and cautious comparisons |
 | Validation and learning | `validation_learning.py` | `ValidationObservation`, `ValidatedLearning` |
 | Optional persistence and audit | `persistence.py` | Stored records and `AuditEvent` |
 

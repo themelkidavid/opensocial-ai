@@ -16,8 +16,10 @@ from typing import Dict, List, Optional
 
 try:
     from src.innovation_reasoning import InnovationHypothesis
+    from src.outcome_metrics import OutcomeMetric
 except ModuleNotFoundError:
     from innovation_reasoning import InnovationHypothesis
+    from outcome_metrics import OutcomeMetric
 
 
 @dataclass
@@ -37,6 +39,7 @@ class ExperimentDesign:
     stop_conditions: List[str]
     validation_question: str
     analysis_evidence_ids: List[str] = field(default_factory=list)
+    outcome_metrics: List[OutcomeMetric] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         """Return the experiment design as a dictionary."""
@@ -52,6 +55,17 @@ class ExperimentDesign:
         return replace(
             self,
             analysis_evidence_ids=list(evidence_ids),
+        )
+
+    def with_outcome_metrics(
+        self,
+        outcome_metrics: List[OutcomeMetric],
+    ) -> "ExperimentDesign":
+        """Return a design with caller-defined intended outcome measures."""
+
+        return replace(
+            self,
+            outcome_metrics=[metric.validated() for metric in outcome_metrics],
         )
 
 

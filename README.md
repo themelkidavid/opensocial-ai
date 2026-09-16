@@ -295,6 +295,14 @@ IDs from earlier in-memory versions must re-associate those legacy records
 explicitly; this initial persistence phase does not provide an automatic
 legacy-ID migration.
 
+### Outcome metrics and comparative learning
+
+Experiments may carry caller-defined outcome metric plans and separately
+recorded, reviewer-attributed outcome observations. Comparisons calculate
+transparent differences only where values are mathematically compatible and
+surface warnings about population, period, method, context, and baseline
+differences. They never select a winner or establish causality.
+
 ### Optional persistence, ingestion, and auditability
 
 The in-memory workflow remains the default. Applications that need local,

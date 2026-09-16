@@ -190,6 +190,16 @@ Improved System
 
 ## Implementation guardrails
 
+## Outcome measurement and comparison
+
+An observed improvement is not a causal effect, and a higher value is not a
+better intervention. Outcome observations remain separate from interpreted
+learning and require a reviewer and evidence source. Comparisons retain
+warnings for differences in populations, periods, measurement methods,
+contexts, units, and missing or zero baselines. They describe documented
+measurements only: they do not rank interventions, establish effectiveness,
+or replace human and community interpretation.
+
 The current engine represents evidence, patterns, insights, hypotheses,
 experiments, and learning as different data types. An observed result
 from an inspiration or pilot is never automatically converted into a

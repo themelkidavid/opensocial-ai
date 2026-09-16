@@ -27,6 +27,7 @@ try:
         ValidationObservation,
     )
     from src.historical_memory import HistoricalProgramme, MechanismRecord
+    from src.outcome_metrics import ComparativeLearningEngine, OutcomeMetric, OutcomeObservation
 except ModuleNotFoundError:
     from evidence import EvidenceItem, create_evidence
     from experiment_design import ExperimentDesign
@@ -36,6 +37,7 @@ except ModuleNotFoundError:
         ValidationObservation,
     )
     from historical_memory import HistoricalProgramme, MechanismRecord
+    from outcome_metrics import ComparativeLearningEngine, OutcomeMetric, OutcomeObservation
 
 
 @dataclass
@@ -631,6 +633,15 @@ class SQLiteExperimentRepository:
                     evidence_row["evidence_id"]
                     for evidence_row in evidence_rows
                 ],
+                outcome_metrics=[
+                    OutcomeMetric(**_load_mapping(metric_row["payload_json"]))
+                    for metric_row in self._connection.execute(
+                        "SELECT outcome_metrics.payload_json FROM outcome_metrics "
+                        "JOIN experiment_metrics USING (metric_id) "
+                        "WHERE experiment_metrics.experiment_id = ?",
+                        (experiment_id,),
+                    ).fetchall()
+                ],
             ),
             created_at=row["created_at"],
         )
@@ -984,6 +995,69 @@ class SQLiteHistoricalRepository:
             self._audit_events._record("historical_learning_linked","historical_programme",programme_id,"Exploratory learning was linked to a historical record.",{"mechanism_id":mechanism_id,"learning_id":learning_id})
 
 
+class SQLiteOutcomeRepository:
+    """Main-store repository for metric plans and reviewer-attributed outcomes."""
+    def __init__(self, connection, experiments, audit_events):
+        self._connection, self._experiments, self._audit_events = connection, experiments, audit_events
+
+    def attach_metric(self, experiment_id, metric):
+        if self._experiments.get(experiment_id) is None:
+            raise ValueError("Unknown experiment_id")
+        metric = metric.validated()
+        with _write_transaction(self._connection):
+            self._connection.execute("INSERT OR IGNORE INTO outcome_metrics VALUES (?, ?, ?, ?)",
+                (metric.metric_id, _dump_json(metric.to_dict()), _timestamp(), metric.name))
+            self._connection.execute("INSERT OR IGNORE INTO experiment_metrics VALUES (?, ?)",
+                (experiment_id, metric.metric_id))
+            self._audit_events._record("outcome_metric_created", "outcome_metric", metric.metric_id,
+                "An outcome metric definition was stored; no outcome was inferred.", {})
+            self._audit_events._record("metric_attached_to_experiment", "experiment", experiment_id,
+                "An intended outcome metric was attached to an experiment.", {"metric_id": metric.metric_id})
+        return metric
+
+    def get_metric(self, metric_id):
+        row = self._connection.execute("SELECT payload_json FROM outcome_metrics WHERE metric_id=?", (metric_id,)).fetchone()
+        return OutcomeMetric(**_load_mapping(row["payload_json"])) if row else None
+
+    def list_metrics(self, experiment_id):
+        rows = self._connection.execute("SELECT metric_id FROM experiment_metrics WHERE experiment_id=?", (experiment_id,)).fetchall()
+        return [self.get_metric(row["metric_id"]) for row in rows]
+
+    def record_observation(self, observation):
+        if self._experiments.get(observation.experiment_id) is None:
+            raise ValueError("Unknown experiment_id")
+        metric = self.get_metric(observation.metric_id)
+        if metric is None:
+            raise ValueError("Unknown metric_id")
+        linked = self._connection.execute("SELECT 1 FROM experiment_metrics WHERE experiment_id=? AND metric_id=?", (observation.experiment_id, observation.metric_id)).fetchone()
+        if linked is None:
+            raise ValueError("metric_id is not attached to experiment_id")
+        observation = observation.validated(metric)
+        with _write_transaction(self._connection):
+            self._connection.execute("INSERT OR IGNORE INTO outcome_observations VALUES (?, ?, ?, ?, ?)",
+                (observation.observation_id, observation.experiment_id, observation.metric_id, _dump_json(observation.to_dict()), _timestamp()))
+            self._audit_events._record("outcome_observation_recorded", "outcome_observation", observation.observation_id,
+                "A reviewer-attributed outcome observation was recorded; it does not establish effectiveness.", {"metric_id": observation.metric_id})
+            self._audit_events._record("outcome_observation_reviewed", "outcome_observation", observation.observation_id,
+                "Reviewer attribution was recorded for an outcome observation.", {"reviewer": observation.reviewer})
+        return observation
+
+    def list_observations(self, experiment_id):
+        rows = self._connection.execute("SELECT payload_json FROM outcome_observations WHERE experiment_id=? ORDER BY created_at", (experiment_id,)).fetchall()
+        return [OutcomeObservation(**_load_mapping(row["payload_json"])) for row in rows]
+
+    def compare(self, observation_a, observation_b):
+        metric = self.get_metric(observation_a.metric_id)
+        if metric is None or observation_a.metric_id != observation_b.metric_id:
+            raise ValueError("outcome observations must reference the same known metric_id")
+        comparison = ComparativeLearningEngine().compare(metric, observation_a, observation_b)
+        self._audit_events.record("experiment_comparison_generated", "outcome_metric", metric.metric_id,
+            "A transparent comparison of recorded observations was generated; no causal conclusion was made.", {})
+        self._audit_events.record("comparative_learning_generated", "outcome_metric", metric.metric_id,
+            "Comparative learning was generated as an exploratory summary, not an intervention ranking.", {})
+        return comparison
+
+
 class SQLitePersistenceStore(PersistenceStore):
     """Optional SQLite implementation of the persistence-store interface."""
 
@@ -1014,6 +1088,9 @@ class SQLitePersistenceStore(PersistenceStore):
         self.historical = SQLiteHistoricalRepository(
             self._connection, self.audit_events, self.learning
         )
+        self.outcomes = SQLiteOutcomeRepository(
+            self._connection, self.experiments, self.audit_events
+        )
 
     def save_evidence(
         self,
@@ -1030,7 +1107,10 @@ class SQLitePersistenceStore(PersistenceStore):
     ) -> StoredExperiment:
         """Persist one experiment design through the storage interface."""
 
-        return self.experiments.save(experiment)
+        saved = self.experiments.save(experiment)
+        for metric in experiment.outcome_metrics:
+            self.outcomes.attach_metric(experiment.experiment_id, metric)
+        return saved
 
     def record_observation(
         self,
@@ -1054,6 +1134,15 @@ class SQLitePersistenceStore(PersistenceStore):
 
     def save_mechanism(self, mechanism: MechanismRecord):
         return self.historical.save_mechanism(mechanism)
+
+    def attach_outcome_metric(self, experiment_id: str, metric: OutcomeMetric):
+        return self.outcomes.attach_metric(experiment_id, metric)
+
+    def record_outcome_observation(self, observation: OutcomeObservation):
+        return self.outcomes.record_observation(observation)
+
+    def compare_outcomes(self, observation_a: OutcomeObservation, observation_b: OutcomeObservation):
+        return self.outcomes.compare(observation_a, observation_b)
 
     @contextmanager
     def transaction(self):
@@ -1213,6 +1302,23 @@ class SQLitePersistenceStore(PersistenceStore):
                     FOREIGN KEY (programme_id) REFERENCES historical_programmes(programme_id),
                     FOREIGN KEY (mechanism_id) REFERENCES mechanism_records(mechanism_id),
                     FOREIGN KEY (learning_id) REFERENCES learning_records(learning_id)
+                );
+                CREATE TABLE IF NOT EXISTS outcome_metrics (
+                    metric_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL, name TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS experiment_metrics (
+                    experiment_id TEXT NOT NULL, metric_id TEXT NOT NULL,
+                    PRIMARY KEY (experiment_id, metric_id),
+                    FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id),
+                    FOREIGN KEY (metric_id) REFERENCES outcome_metrics(metric_id)
+                );
+                CREATE TABLE IF NOT EXISTS outcome_observations (
+                    observation_id TEXT PRIMARY KEY, experiment_id TEXT NOT NULL,
+                    metric_id TEXT NOT NULL, payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id),
+                    FOREIGN KEY (metric_id) REFERENCES outcome_metrics(metric_id)
                 );
                 """
             )
@@ -1428,4 +1534,5 @@ def _experiment_definition(experiment: ExperimentDesign) -> Dict:
 
     definition = experiment.to_dict()
     definition.pop("analysis_evidence_ids", None)
+    definition.pop("outcome_metrics", None)
     return definition

@@ -108,6 +108,33 @@ class ValidationLearningEngine:
             for observation in observations
         ]
 
+    def evaluate_outcome(
+        self,
+        outcome_observation,
+        metric,
+        experiment_title: str,
+    ) -> ValidatedLearning:
+        """Turn one reviewed measurement into cautious, non-causal learning."""
+
+        from src.outcome_metrics import OutcomeObservation, OutcomeMetric
+
+        if not isinstance(outcome_observation, OutcomeObservation):
+            raise TypeError("outcome_observation must be an OutcomeObservation")
+        if not isinstance(metric, OutcomeMetric):
+            raise TypeError("metric must be an OutcomeMetric")
+        outcome_observation = outcome_observation.validated(metric.validated())
+        observation = self.create_observation(
+            outcome_observation.experiment_id,
+            experiment_title,
+            f"The pilot recorded {outcome_observation.value} {metric.unit} for {metric.name}.",
+            [outcome_observation.evidence_source],
+            limitations=list(outcome_observation.limitations) + [
+                "A recorded metric change may warrant further testing but does not establish causality or effectiveness."
+            ],
+            reviewer=outcome_observation.reviewer,
+        )
+        return self.evaluate([observation])[0]
+
     @staticmethod
     def _build_learning(
         observation: ValidationObservation,
