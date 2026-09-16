@@ -205,3 +205,78 @@ AI-Assisted Learning
       ↓
 Improved Intervention
       ↺
+```
+
+## How the Innovation Discovery Engine works
+
+The current implementation is a transparent, deterministic foundation
+for evidence-aware innovation work. It does not use a machine-learning
+model or claim to predict whether an intervention will succeed.
+
+```text
+Evidence
+  → Pattern discovery
+  → Evidence quality, gaps, and conflicts
+  → Insight generation
+  → Innovation opportunities
+  → Relevant inspirations and combinations
+  → Testable innovation hypotheses
+  → Structured experiment designs
+  → Human-reviewed validation observations
+  → Exploratory learning
+```
+
+Each stage keeps a distinct output type. Evidence remains evidence;
+patterns are observations; insights and innovation opportunities remain
+interpretations; hypotheses and combinations remain unproven proposals;
+and learning remains exploratory even after a reviewed pilot outcome.
+
+### Innovation inspiration and combination
+
+An `InnovationInspiration` records a documented mechanism and its
+observed result in another context. The reasoning engine retrieves
+inspirations with transparent keyword overlap. When two or more sources
+are relevant and an innovation or transfer opportunity has a sufficient
+evidence basis, `InnovationCombinationEngine` can create a pairwise
+design hypothesis that preserves both mechanisms and their uncertainty. It
+does not treat either source result as proof that the combination will
+work locally.
+
+### Experiments and validation
+
+`ExperimentDesignEngine` converts each innovation hypothesis into a
+small-pilot design with an intervention, comparison, measures,
+safeguards, and stop conditions. `ValidationLearningEngine` only creates
+learning from a caller-supplied, reviewer-attributed observation. It
+always labels that learning `exploratory` and explicitly cautions against
+assuming effectiveness elsewhere or at scale. Each experiment has a
+stable `experiment_id`, which validation observations preserve for
+traceability through serialized learning records.
+
+## Responsible use
+
+Use the engine to structure inquiry, not to automate social-sector
+decisions. Review every output with affected communities and appropriate
+programme, safeguarding, and subject-matter practitioners. Supply only
+the minimum lawful, de-identified information needed for the analysis.
+Read [the responsible AI framework](docs/responsible-ai.md) before using
+the engine with real programme information.
+
+## Development
+
+OpenSocial AI currently has no external runtime dependencies. Python
+3.12 is used in CI.
+
+Run the full test suite from the repository root:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The repository keeps each analytical capability in its own module under
+`src/`, with matching unit tests under `tests/`. To extend the engine,
+add a small, serializable domain object, keep its claims and uncertainty
+explicit, integrate it through `InnovationDiscoveryEngine`, and add
+tests for normal, empty, invalid, and serialization cases. Avoid adding
+model claims to the deterministic baseline unless the model and its
+limits are documented and independently testable.

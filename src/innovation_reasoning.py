@@ -37,11 +37,19 @@ from typing import Dict, List, Optional
 
 
 try:
+    from src.innovation_combination import (
+        InnovationCombination,
+        InnovationCombinationEngine,
+    )
     from src.innovation_inspiration import (
         InnovationInspiration,
         InnovationInspirationEngine,
     )
 except ModuleNotFoundError:
+    from innovation_combination import (
+        InnovationCombination,
+        InnovationCombinationEngine,
+    )
     from innovation_inspiration import (
         InnovationInspiration,
         InnovationInspirationEngine,
@@ -79,10 +87,13 @@ class InnovationReasoningEngine:
     """
 
     def __init__(self) -> None:
-        """Initialise the inspiration retrieval component."""
+        """Initialise the inspiration retrieval and combination components."""
 
         self.inspiration_engine = (
             InnovationInspirationEngine()
+        )
+        self.combination_engine = (
+            InnovationCombinationEngine()
         )
 
     def generate(
@@ -138,6 +149,27 @@ class InnovationReasoningEngine:
                 "unknown",
             )
 
+            if self._can_combine(
+                opportunity_type,
+                opportunity,
+                relevant_inspirations,
+            ):
+                combinations = self.combination_engine.combine(
+                    problem=problem,
+                    opportunity=opportunity,
+                    inspirations=relevant_inspirations,
+                )
+
+                if combinations:
+                    hypotheses.append(
+                        self._generate_combination_hypothesis(
+                            problem,
+                            opportunity,
+                            combinations[0],
+                        )
+                    )
+                    continue
+
             if opportunity_type == "emerging_pattern":
                 hypotheses.append(
                     self._generate_transfer_hypothesis(
@@ -182,6 +214,85 @@ class InnovationReasoningEngine:
                 )
 
         return hypotheses
+
+    @staticmethod
+    def _can_combine(
+        opportunity_type: str,
+        opportunity,
+        relevant_inspirations: List[InnovationInspiration],
+    ) -> bool:
+        """Return whether the available basis supports a combination."""
+
+        if opportunity_type not in {
+            "emerging_pattern",
+            "transfer_opportunity",
+        }:
+            return False
+
+        evidence_basis = getattr(
+            opportunity,
+            "evidence_basis",
+            [],
+        )
+
+        return (
+            isinstance(evidence_basis, list)
+            and len(evidence_basis) >= 2
+            and len(relevant_inspirations) >= 2
+        )
+
+    def _generate_combination_hypothesis(
+        self,
+        problem: str,
+        opportunity,
+        combination: InnovationCombination,
+    ) -> InnovationHypothesis:
+        """Convert a combination-engine result into a hypothesis."""
+
+        evidence_basis = list(
+            getattr(
+                opportunity,
+                "evidence_basis",
+                [],
+            )
+        )
+        evidence_basis.extend(
+            [
+                f"Inspiration source: {combination.inspiration_a}",
+                f"Inspiration source: {combination.inspiration_b}",
+            ]
+        )
+
+        uncertainty = list(
+            getattr(
+                opportunity,
+                "uncertainty",
+                [],
+            )
+        )
+        uncertainty.extend(combination.uncertainty)
+
+        return InnovationHypothesis(
+            title=combination.title,
+            problem_connection=problem,
+            inspiration_source=(
+                f"combined inspirations: "
+                f"{combination.inspiration_a}; "
+                f"{combination.inspiration_b}"
+            ),
+            underlying_mechanism=combination.combined_mechanism,
+            novel_combination=combination.description,
+            why_it_might_work=combination.rationale,
+            evidence_basis=evidence_basis,
+            confidence=getattr(
+                opportunity,
+                "confidence",
+                "exploratory",
+            ),
+            uncertainty=uncertainty,
+            experiment=combination.experiment,
+            validation_question=combination.validation_question,
+        )
 
     def _generate_transfer_hypothesis(
         self,
@@ -295,7 +406,8 @@ class InnovationReasoningEngine:
             )
 
             novel_combination = (
-                "Combine the observed mechanism with the "
+                "Combine the observed mechanism through cross-domain "
+                "transfer with the "
                 "needs and constraints of the current problem."
             )
 
@@ -380,8 +492,8 @@ class InnovationReasoningEngine:
                 "evidence-gap analysis"
             ),
             underlying_mechanism=(
-                "Generate better innovation hypotheses by "
-                "collecting information about the missing "
+                "Generate better innovation hypotheses through "
+                "evidence collection about the missing "
                 "population, context, outcomes or implementation "
                 "conditions."
             ),

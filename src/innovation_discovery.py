@@ -14,7 +14,9 @@ Combines:
 - innovation opportunity detection
 - innovation inspiration
 - innovation reasoning
-- innovation hypothesis generation
+- innovation combination
+- experiment design
+- validation and learning
 
 The engine remains model-independent and transparent.
 
@@ -69,6 +71,17 @@ try:
         InnovationHypothesis,
     )
 
+    from src.experiment_design import (
+        ExperimentDesignEngine,
+        ExperimentDesign,
+    )
+
+    from src.validation_learning import (
+        ValidationLearningEngine,
+        ValidationObservation,
+        ValidatedLearning,
+    )
+
 except ModuleNotFoundError:
 
     from evidence import EvidenceItem
@@ -110,6 +123,17 @@ except ModuleNotFoundError:
     from innovation_reasoning import (
         InnovationReasoningEngine,
         InnovationHypothesis,
+    )
+
+    from experiment_design import (
+        ExperimentDesignEngine,
+        ExperimentDesign,
+    )
+
+    from validation_learning import (
+        ValidationLearningEngine,
+        ValidationObservation,
+        ValidatedLearning,
     )
 
 
@@ -173,6 +197,14 @@ class InnovationReport:
         default_factory=list
     )
 
+    experiment_designs: List[ExperimentDesign] = field(
+        default_factory=list
+    )
+
+    validated_learning: List[ValidatedLearning] = field(
+        default_factory=list
+    )
+
     def to_dict(self) -> Dict:
         """Return the complete report as a dictionary."""
 
@@ -216,7 +248,11 @@ class InnovationDiscoveryEngine:
            ↓
         Innovation Reasoning
            ↓
-        Innovation Hypotheses
+        Innovation Combination
+           ↓
+        Experiment Design
+           ↓
+        Validation and Learning
            ↓
         Innovation Report
     """
@@ -250,12 +286,23 @@ class InnovationDiscoveryEngine:
             InnovationReasoningEngine()
         )
 
+        self.experiment_design_engine = (
+            ExperimentDesignEngine()
+        )
+
+        self.validation_learning_engine = (
+            ValidationLearningEngine()
+        )
+
     def analyse(
         self,
         problem: str,
         evidence: Optional[List[EvidenceItem]] = None,
         inspirations: Optional[
             List[InnovationInspiration]
+        ] = None,
+        validation_observations: Optional[
+            List[ValidationObservation]
         ] = None,
     ) -> InnovationReport:
         """
@@ -271,6 +318,10 @@ class InnovationDiscoveryEngine:
         External inspiration can be supplied to help the
         reasoning layer identify mechanisms that may be
         adapted to the current problem.
+
+        Human-reviewed validation observations can be supplied
+        from prior experiments. They are recorded as exploratory
+        learning rather than proof that an intervention works.
         """
 
         if not problem or not problem.strip():
@@ -283,6 +334,10 @@ class InnovationDiscoveryEngine:
         evidence = evidence or []
 
         inspirations = inspirations or []
+
+        validation_observations = (
+            validation_observations or []
+        )
 
         self._validate_evidence(
             evidence
@@ -465,6 +520,18 @@ class InnovationDiscoveryEngine:
                 )
             )
 
+        experiment_designs = (
+            self.experiment_design_engine.design(
+                innovation_hypotheses
+            )
+        )
+
+        validated_learning = (
+            self.validation_learning_engine.evaluate(
+                validation_observations
+            )
+        )
+
         validation_questions = [
             "Do community members recognise this problem and its causes?",
             "What evidence supports each proposed explanation?",
@@ -512,6 +579,12 @@ class InnovationDiscoveryEngine:
                 ]
             )
 
+        if experiment_designs:
+            validation_questions.append(
+                "Who will review the pilot evidence with affected "
+                "communities before any decision to scale?"
+            )
+
         return InnovationReport(
             problem=problem,
             reframed_problem=reframed_problem,
@@ -529,6 +602,8 @@ class InnovationDiscoveryEngine:
             insights=insights,
             innovation_opportunities=innovation_opportunities,
             innovation_hypotheses=innovation_hypotheses,
+            experiment_designs=experiment_designs,
+            validated_learning=validated_learning,
         )
 
     @staticmethod

@@ -2,6 +2,7 @@ import unittest
 
 from src.evidence import create_evidence
 from src.innovation_discovery import InnovationDiscoveryEngine
+from src.validation_learning import ValidationLearningEngine
 
 
 class TestInnovationDiscoveryEngine(unittest.TestCase):
@@ -1093,5 +1094,92 @@ class TestInnovationDiscoveryEngine(unittest.TestCase):
             report.innovation_hypotheses,
             [],
         )
+
+    def test_experiment_designs_are_generated_from_hypotheses(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content="Peer support improved service engagement.",
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content="Peer support was helpful for accessing services.",
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+
+        report = self.engine.analyse(
+            "Young people face barriers to service access.",
+            evidence=evidence,
+        )
+
+        self.assertEqual(
+            len(report.experiment_designs),
+            len(report.innovation_hypotheses),
+        )
+        self.assertTrue(report.experiment_designs[0].safeguards)
+        self.assertTrue(report.experiment_designs[0].stop_conditions)
+        self.assertIn("experiment_designs", report.to_dict())
+
+    def test_human_reviewed_observation_is_included_as_learning(self):
+        evidence = [
+            create_evidence(
+                source_type="programme_report",
+                content="Peer support improved service engagement.",
+                date="2025-06-30",
+                location="Madurai",
+                population="Young people",
+            ),
+            create_evidence(
+                source_type="community_feedback",
+                content="Peer support was helpful for accessing services.",
+                date="2025-07-15",
+                location="Madurai",
+                population="Young people",
+            ),
+        ]
+        problem = "Young people face barriers to service access."
+        experiment = self.engine.analyse(
+            problem,
+            evidence=evidence,
+        ).experiment_designs[0]
+
+        validation_engine = ValidationLearningEngine()
+        observation = validation_engine.create_observation(
+            experiment_id=experiment.experiment_id,
+            experiment_title=experiment.title,
+            outcome="Participants reported fewer navigation barriers.",
+            evidence_basis=["Pilot feedback"],
+            limitations=["The pilot was conducted in one location."],
+            reviewer="Programme and community review group",
+        )
+
+        report = self.engine.analyse(
+            problem,
+            evidence=evidence,
+            validation_observations=[observation],
+        )
+
+        self.assertEqual(len(report.validated_learning), 1)
+        self.assertEqual(
+            report.validated_learning[0].confidence,
+            "exploratory",
+        )
+        self.assertEqual(
+            report.validated_learning[0].experiment_id,
+            report.experiment_designs[0].experiment_id,
+        )
+        self.assertEqual(
+            report.to_dict()["validated_learning"][0]["experiment_id"],
+            report.to_dict()["experiment_designs"][0]["experiment_id"],
+        )
+        self.assertIn("validated_learning", report.to_dict())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -626,8 +626,101 @@ class TestInnovationReasoningEngine(unittest.TestCase):
         )
 
         self.assertTrue(
+            hypothesis.title.startswith("Combine")
+        )
+
+        self.assertIn(
+            "combined inspirations",
+            hypothesis.inspiration_source,
+        )
+
+        self.assertTrue(
             "mobile" in combined_text
             or "outreach" in combined_text
+        )
+
+    def test_evidence_gap_is_not_replaced_by_a_combination(self):
+        inspirations = [
+            self._create_inspiration(
+                source_type="cross_sector",
+                title="Peer navigation model",
+                context="Community health services",
+                mechanism="Trusted peers guide people through services.",
+                observed_result="Improved service engagement.",
+            ),
+            self._create_inspiration(
+                source_type="community",
+                title="Mobile outreach model",
+                context="Community service delivery",
+                mechanism="Services are brought closer to communities.",
+                observed_result="Improved access.",
+            ),
+        ]
+
+        opportunity = SimpleNamespace(
+            opportunity_type="evidence_gap",
+            title="Missing population evidence",
+            description="Population evidence is incomplete.",
+            evidence_basis=["Programme report", "Community feedback"],
+            confidence="low",
+            uncertainty=["The affected population is unclear."],
+        )
+
+        hypothesis = self.engine.generate(
+            problem="Young people face service access barriers.",
+            opportunities=[opportunity],
+            inspirations=inspirations,
+        )[0]
+
+        self.assertEqual(
+            hypothesis.title,
+            "Strengthen evidence before designing at scale",
+        )
+        self.assertEqual(
+            hypothesis.inspiration_source,
+            "evidence-gap analysis",
+        )
+
+    def test_contradiction_is_not_replaced_by_a_combination(self):
+        inspirations = [
+            self._create_inspiration(
+                source_type="cross_sector",
+                title="Peer navigation model",
+                context="Community health services",
+                mechanism="Trusted peers guide people through services.",
+                observed_result="Improved service engagement.",
+            ),
+            self._create_inspiration(
+                source_type="community",
+                title="Mobile outreach model",
+                context="Community service delivery",
+                mechanism="Services are brought closer to communities.",
+                observed_result="Improved access.",
+            ),
+        ]
+
+        opportunity = SimpleNamespace(
+            opportunity_type="contradiction",
+            title="Conflicting access outcomes",
+            description="Evidence sources report different access outcomes.",
+            evidence_basis=["Programme report", "Community feedback"],
+            confidence="low",
+            uncertainty=["The contexts may differ."],
+        )
+
+        hypothesis = self.engine.generate(
+            problem="Young people face service access barriers.",
+            opportunities=[opportunity],
+            inspirations=inspirations,
+        )[0]
+
+        self.assertEqual(
+            hypothesis.title,
+            "Design for different implementation contexts",
+        )
+        self.assertIn(
+            "contradictory evidence",
+            hypothesis.inspiration_source,
         )
 
 

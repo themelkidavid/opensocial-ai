@@ -186,3 +186,13 @@ Evaluation
 Learning
     ↓
 Improved System
+```
+
+## Implementation guardrails
+
+The current engine represents evidence, patterns, insights, hypotheses,
+experiments, and learning as different data types. An observed result
+from an inspiration or pilot is never automatically converted into a
+proven intervention. Experiment designs include safeguards and stop
+conditions, while validation learning requires a named human reviewer
+and remains exploratory.
