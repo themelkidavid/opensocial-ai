@@ -30,6 +30,7 @@ try:
     from src.outcome_metrics import ComparativeLearningEngine, OutcomeMetric, OutcomeObservation
     from src.portfolio_learning import ProgrammePortfolio
     from src.strategic_scenarios import StrategicScenario
+    from src.governance import GovernanceReview, DecisionRecord, ExperimentAuthorization
 except ModuleNotFoundError:
     from evidence import EvidenceItem, create_evidence
     from experiment_design import ExperimentDesign
@@ -42,6 +43,7 @@ except ModuleNotFoundError:
     from outcome_metrics import ComparativeLearningEngine, OutcomeMetric, OutcomeObservation
     from portfolio_learning import ProgrammePortfolio
     from strategic_scenarios import StrategicScenario
+    from governance import GovernanceReview, DecisionRecord, ExperimentAuthorization
 
 
 @dataclass
@@ -1116,6 +1118,57 @@ class SQLiteScenarioRepository:
         return updated
     def record_comparison(self, scenario_ids): self._audit_events.record("scenario_compared","scenario",scenario_ids[0] if scenario_ids else "none","Scenarios were compared descriptively; no ranking was produced.",{})
 
+class SQLiteGovernanceRepository:
+ def __init__(self,c,s,a): self._connection,self._scenarios,self._audit_events=c,s,a
+ def save_review(self,review):
+  review=review.validated()
+  if review.subject_type=="strategic_scenario" and self._scenarios.get(review.subject_id) is None: raise ValueError("Unknown scenario subject")
+  self._connection.execute("INSERT OR IGNORE INTO governance_reviews VALUES (?,?,?,?)",(review.review_id,review.subject_type,review.subject_id,_dump_json(review.to_dict()))); self._connection.commit(); self._audit_events.record("governance_review_created","governance_review",review.review_id,"Human governance review was recorded.",{"actor_id":review.reviewer_id}); return review
+ def get_review(self,rid):
+  r=self._connection.execute("SELECT payload_json FROM governance_reviews WHERE review_id=?",(rid,)).fetchone(); return GovernanceReview(**_load_mapping(r["payload_json"])) if r else None
+ def list_reviews_by_subject(self,typ,sid): return [GovernanceReview(**_load_mapping(r["payload_json"])) for r in self._connection.execute("SELECT payload_json FROM governance_reviews WHERE subject_type=? AND subject_id=? ORDER BY review_id",(typ,sid))]
+ def save_decision(self,decision):
+  decision=decision.validated()
+  if decision.subject_type=="strategic_scenario" and self._scenarios.get(decision.subject_id) is None: raise ValueError("Unknown scenario subject")
+  for rid in decision.review_ids:
+   if self._connection.execute("SELECT 1 FROM governance_reviews WHERE review_id=?",(rid,)).fetchone() is None: raise ValueError("Unknown review_id")
+  if decision.supersedes_decision_id and self.get_decision(decision.supersedes_decision_id) is None: raise ValueError("Unknown superseded decision")
+  if decision.supersedes_decision_id:
+   prior=self.get_decision(decision.supersedes_decision_id)
+   if prior.subject_type!=decision.subject_type or prior.subject_id!=decision.subject_id: raise ValueError("Superseded decision must have the same subject")
+   if prior.decision_id==decision.decision_id: raise ValueError("Decision cannot supersede itself")
+   if decision.decision_status!="recorded": raise ValueError("Superseding decision must be recorded")
+   superseded=DecisionRecord(**{**prior.to_dict(),"decision_status":"superseded"})
+   self._connection.execute("UPDATE governance_decisions SET payload_json=? WHERE decision_id=?",(_dump_json(superseded.to_dict()),prior.decision_id))
+   self._audit_events._record("decision_superseded","decision",prior.decision_id,"A prior human decision was superseded and retained in history.",{"actor_id":decision.decision_maker_id})
+  self._connection.execute("INSERT INTO governance_decisions VALUES (?,?,?,?)",(decision.decision_id,decision.subject_type,decision.subject_id,_dump_json(decision.to_dict()))); self._connection.commit(); self._audit_events.record("decision_recorded","decision",decision.decision_id,"Explicit human decision was recorded; it does not establish effectiveness.",{"actor_id":decision.decision_maker_id}); return decision
+ def get_decision(self,did):
+  r=self._connection.execute("SELECT payload_json FROM governance_decisions WHERE decision_id=?",(did,)).fetchone(); return DecisionRecord(**_load_mapping(r["payload_json"])) if r else None
+ def list_decisions(self,typ,sid): return [DecisionRecord(**_load_mapping(r["payload_json"])) for r in self._connection.execute("SELECT payload_json FROM governance_decisions WHERE subject_type=? AND subject_id=?",(typ,sid))]
+ list_decisions_by_subject=list_decisions
+ def get_active_decision(self,typ,sid):
+  decisions=self.list_decisions(typ,sid); superseded={d.supersedes_decision_id for d in decisions if d.supersedes_decision_id}; active=[d for d in decisions if d.decision_status=="recorded" and d.decision_id not in superseded]
+  return sorted(active,key=lambda d:d.decision_id)[-1] if active else None
+ def authorize(self,auth):
+  d=self.get_decision(auth.decision_id)
+  if d is None or d.decision_status!="recorded" or d.decision_type not in {"proceed_to_experiment_design","approve_experiment"} or not d.decision_maker_id: raise ValueError("Authorization requires an explicit recorded human decision permitting experiment progression")
+  if self._scenarios.get(auth.scenario_id) is None: raise ValueError("Unknown scenario")
+  aid=auth.authorization_id or _stable_id("authorization",auth.to_dict()); auth=ExperimentAuthorization(**{**auth.to_dict(),"authorization_id":aid}); self._connection.execute("INSERT INTO experiment_authorizations VALUES (?,?,?,?)",(aid,auth.decision_id,auth.scenario_id,_dump_json(auth.to_dict()))); self._connection.commit(); self._audit_events.record("experiment_authorization_created","authorization",aid,"Explicit human authorization was recorded; it is not evidence of success.",{"actor_id":auth.authorized_by}); return auth
+ def get_authorization(self,aid):
+  r=self._connection.execute("SELECT payload_json FROM experiment_authorizations WHERE authorization_id=?",(aid,)).fetchone(); return ExperimentAuthorization(**_load_mapping(r["payload_json"])) if r else None
+ def list_authorizations_by_decision(self,did): return [ExperimentAuthorization(**_load_mapping(r["payload_json"])) for r in self._connection.execute("SELECT payload_json FROM experiment_authorizations WHERE decision_id=? ORDER BY authorization_id",(did,))]
+ def list_authorizations_by_scenario(self,sid): return [ExperimentAuthorization(**_load_mapping(r["payload_json"])) for r in self._connection.execute("SELECT payload_json FROM experiment_authorizations WHERE scenario_id=? ORDER BY authorization_id",(sid,))]
+ def timeline(self,typ,sid):
+  events=[]
+  for event in self._audit_events.list_events():
+   if event.entity_id==sid or event.metadata.get("subject_id")==sid: events.append(event.to_dict())
+  for review in self.list_reviews_by_subject(typ,sid): events.append({"event_type":"governance_review","entity_type":"governance_review","entity_id":review.review_id,"timestamp":review.reviewed_at or "","description":"Human governance review record.","actor_id":review.reviewer_id})
+  for decision in self.list_decisions(typ,sid): events.append({"event_type":"decision","entity_type":"decision","entity_id":decision.decision_id,"timestamp":decision.decided_at or "","description":"Human decision record.","actor_id":decision.decision_maker_id})
+  return sorted(events,key=lambda e:(e.get("timestamp") or "",e.get("entity_id") or ""))
+ def summary(self,typ,sid):
+  reviews=self.list_reviews_by_subject(typ,sid); decisions=self.list_decisions(typ,sid); active=self.get_active_decision(typ,sid); auths=self.list_authorizations_by_scenario(sid) if typ=="strategic_scenario" else []
+  return {"subject_type":typ,"subject_id":sid,"evidence_references":[x for d in decisions for x in d.evidence_basis],"reviews":[r.to_dict() for r in reviews],"concerns":[x for r in reviews for x in r.concerns],"unresolved_questions":[x for r in reviews for x in r.unresolved_questions],"alternatives":[x for d in decisions for x in d.alternatives_considered],"dissent_or_reservations":[x for d in decisions for x in d.dissent_or_reservations],"decision_history":[d.to_dict() for d in decisions],"active_decision":active.to_dict() if active else None,"authorizations":[a.to_dict() for a in auths]}
+
 
 class SQLitePersistenceStore(PersistenceStore):
     """Optional SQLite implementation of the persistence-store interface."""
@@ -1152,6 +1205,7 @@ class SQLitePersistenceStore(PersistenceStore):
         )
         self.portfolios = SQLitePortfolioRepository(self._connection,self.historical,self.experiments,self.audit_events)
         self.scenarios = SQLiteScenarioRepository(self._connection,self.historical,self.audit_events)
+        self.governance = SQLiteGovernanceRepository(self._connection,self.scenarios,self.audit_events)
 
     def save_evidence(
         self,
@@ -1390,6 +1444,9 @@ class SQLitePersistenceStore(PersistenceStore):
                 CREATE TABLE IF NOT EXISTS strategic_scenarios (
                     scenario_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS governance_reviews (review_id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, payload_json TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS governance_decisions (decision_id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, payload_json TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS experiment_authorizations (authorization_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, scenario_id TEXT NOT NULL, payload_json TEXT NOT NULL);
                 """
             )
 
