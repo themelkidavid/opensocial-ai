@@ -105,3 +105,7 @@ without mistaking organisational records for universal truth.
 Outcome metrics make pilot measurement more explicit while retaining this
 distinction: recorded changes and comparisons are inputs to human learning,
 not automatic proof of causal effectiveness or a universal best approach.
+
+Portfolio learning can connect documented programme records across contexts,
+while preserving their differences and treating recurrence as a question for
+human investigation rather than a claim of universal effectiveness.

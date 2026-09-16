@@ -303,6 +303,13 @@ transparent differences only where values are mathematically compatible and
 surface warnings about population, period, method, context, and baseline
 differences. They never select a winner or establish causality.
 
+### Portfolio learning and strategy discovery
+
+`ProgrammePortfolio` groups caller-selected programme and experiment records.
+Portfolio learning describes mechanism recurrence, evidence gaps, context and
+measurement differences without ranking programmes or inferring effectiveness.
+Its strategy opportunities are questions for human investigation, not recommendations.
+
 ### Optional persistence, ingestion, and auditability
 
 The in-memory workflow remains the default. Applications that need local,

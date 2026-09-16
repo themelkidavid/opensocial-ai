@@ -28,6 +28,7 @@ try:
     )
     from src.historical_memory import HistoricalProgramme, MechanismRecord
     from src.outcome_metrics import ComparativeLearningEngine, OutcomeMetric, OutcomeObservation
+    from src.portfolio_learning import ProgrammePortfolio
 except ModuleNotFoundError:
     from evidence import EvidenceItem, create_evidence
     from experiment_design import ExperimentDesign
@@ -38,6 +39,7 @@ except ModuleNotFoundError:
     )
     from historical_memory import HistoricalProgramme, MechanismRecord
     from outcome_metrics import ComparativeLearningEngine, OutcomeMetric, OutcomeObservation
+    from portfolio_learning import ProgrammePortfolio
 
 
 @dataclass
@@ -1058,6 +1060,33 @@ class SQLiteOutcomeRepository:
         return comparison
 
 
+class SQLitePortfolioRepository:
+    """Persisted portfolio metadata using the main audit and SQLite boundary."""
+    def __init__(self, connection, historical, experiments, audit_events):
+        self._connection,self._historical,self._experiments,self._audit_events=connection,historical,experiments,audit_events
+    def save(self, portfolio):
+        portfolio=portfolio.validated()
+        for programme_id in portfolio.programme_ids:
+            if self._historical.get_programme(programme_id) is None: raise ValueError("Unknown programme_id")
+        for experiment_id in portfolio.experiment_ids:
+            if self._experiments.get(experiment_id) is None: raise ValueError("Unknown experiment_id")
+        with _write_transaction(self._connection):
+            row=self._connection.execute("SELECT payload_json FROM portfolios WHERE portfolio_id=?",(portfolio.portfolio_id,)).fetchone()
+            if row: return ProgrammePortfolio(**_load_mapping(row["payload_json"]))
+            self._connection.execute("INSERT INTO portfolios VALUES (?,?,?)",(portfolio.portfolio_id,_dump_json(portfolio.to_dict()),_timestamp()))
+            self._audit_events._record("portfolio_created","portfolio",portfolio.portfolio_id,"Portfolio metadata was stored for exploratory analysis.",{})
+        return portfolio
+    def get(self, portfolio_id):
+        row=self._connection.execute("SELECT payload_json FROM portfolios WHERE portfolio_id=?",(portfolio_id,)).fetchone()
+        return ProgrammePortfolio(**_load_mapping(row["payload_json"])) if row else None
+    def list(self):
+        return [self.get(row["portfolio_id"]) for row in self._connection.execute("SELECT portfolio_id FROM portfolios ORDER BY created_at")]
+    def record_analysis(self, portfolio_id, patterns, opportunities):
+        self._audit_events.record("portfolio_analysis_performed","portfolio",portfolio_id,"Portfolio records were analysed descriptively; no causal conclusion was made.",{})
+        for pattern in patterns: self._audit_events.record("portfolio_pattern_generated","portfolio",portfolio_id,"A descriptive portfolio pattern was generated.",{"pattern_type":pattern.pattern_type})
+        for opportunity in opportunities: self._audit_events.record("strategy_opportunity_generated","portfolio",portfolio_id,"An exploratory strategy opportunity was generated; it is not a recommendation.",{"pattern_type":opportunity.pattern_type})
+
+
 class SQLitePersistenceStore(PersistenceStore):
     """Optional SQLite implementation of the persistence-store interface."""
 
@@ -1091,6 +1120,7 @@ class SQLitePersistenceStore(PersistenceStore):
         self.outcomes = SQLiteOutcomeRepository(
             self._connection, self.experiments, self.audit_events
         )
+        self.portfolios = SQLitePortfolioRepository(self._connection,self.historical,self.experiments,self.audit_events)
 
     def save_evidence(
         self,
@@ -1143,6 +1173,8 @@ class SQLitePersistenceStore(PersistenceStore):
 
     def compare_outcomes(self, observation_a: OutcomeObservation, observation_b: OutcomeObservation):
         return self.outcomes.compare(observation_a, observation_b)
+
+    def save_portfolio(self, portfolio: ProgrammePortfolio): return self.portfolios.save(portfolio)
 
     @contextmanager
     def transaction(self):
@@ -1319,6 +1351,9 @@ class SQLitePersistenceStore(PersistenceStore):
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id),
                     FOREIGN KEY (metric_id) REFERENCES outcome_metrics(metric_id)
+                );
+                CREATE TABLE IF NOT EXISTS portfolios (
+                    portfolio_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, created_at TEXT NOT NULL
                 );
                 """
             )

@@ -200,6 +200,14 @@ contexts, units, and missing or zero baselines. They describe documented
 measurements only: they do not rank interventions, establish effectiveness,
 or replace human and community interpretation.
 
+## Portfolio learning
+
+Repeated observations and mechanism recurrence are descriptive only: they do
+not establish quality, causality, prediction, or a best programme. Portfolio
+patterns preserve evidence thresholds and context differences. Strategy
+opportunities are investigative questions requiring human approval, not policy
+or intervention recommendations.
+
 The current engine represents evidence, patterns, insights, hypotheses,
 experiments, and learning as different data types. An observed result
 from an inspiration or pilot is never automatically converted into a
