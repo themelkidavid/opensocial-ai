@@ -236,10 +236,21 @@ with reviewer attribution.
 
 An `InnovationInspiration` records a documented mechanism and its
 observed result in another context. `KeywordRetriever` is the default,
-using transparent keyword overlap. `RelevanceRetriever` is an extension
-point for a future retrieval strategy, but no semantic, vector, or LLM
-retrieval is implemented today. Retriever results must be supplied
-inspiration objects; retrieval cannot add a new undocumented source.
+using transparent keyword overlap. `RelevanceRetriever` also supports an
+optional `SemanticRetriever`, which uses cosine similarity over vectors
+from a caller-provided `EmbeddingProvider`; it does not select a model,
+call an external API, or add a dependency. `DeterministicTestEmbeddingProvider`
+is only a local test/reference provider and is not production semantic
+intelligence. `HybridRetriever` can transparently combine keyword and
+semantic scores when an application explicitly opts in. Retriever results
+must be supplied inspiration objects; retrieval cannot add a new
+undocumented source.
+
+Semantic and hybrid matches expose their strategy, numeric score, source
+type, context, and transferability in `RetrievalMatch`. A similarity score
+means only that a source is potentially relevant; it is not causal evidence,
+proof of transferability, contextual equivalence, or a recommended
+intervention.
 
 When two or more sources are relevant and an innovation or transfer
 opportunity has a sufficient evidence basis, `InnovationCombinationEngine`

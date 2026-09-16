@@ -221,3 +221,19 @@ organisation should set appropriate access controls, retention and deletion
 rules, backup and incident procedures, lawful data-handling practices, and
 a process for human/community review. Store only the minimum de-identified
 information needed for the documented purpose.
+
+## Optional semantic retrieval
+
+The default retriever remains deterministic keyword overlap. An application
+may explicitly configure `SemanticRetriever` with its own embedding
+provider, or a transparent `HybridRetriever` with documented keyword and
+semantic score components. OpenSocial AI does not include a hosted embedding
+provider, model, vector database, or external AI service in this phase.
+
+Similarity identifies a potentially relevant candidate inspiration only. It
+is not causal evidence, a measure of intervention effectiveness, proof of
+transferability, contextual equivalence, or a recommendation to implement
+or scale an intervention. A local deterministic provider exists solely for
+testing/reference use and must not be represented as production-quality
+semantic intelligence. Human and community review remain required before
+any adaptation or pilot decision.

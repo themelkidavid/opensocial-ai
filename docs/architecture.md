@@ -84,7 +84,7 @@ following pipeline:
 | Insights | `insight_generation.py` | `InsightCandidate` |
 | Innovation opportunities | `innovation_opportunity.py` | `InnovationOpportunity` |
 | Inspiration | `innovation_inspiration.py` | `InnovationInspiration` |
-| Inspiration retrieval | `retrieval.py` | Ranked objects from the supplied inspiration corpus |
+| Inspiration retrieval | `retrieval.py` | Keyword, optional semantic, or optional hybrid matches from the supplied inspiration corpus |
 | Reasoning and combination | `innovation_reasoning.py`, `innovation_combination.py` | `InnovationHypothesis` |
 | Experiment design | `experiment_design.py` | `ExperimentDesign` |
 | Validation and learning | `validation_learning.py` | `ValidationObservation`, `ValidatedLearning` |
@@ -162,9 +162,23 @@ external API, or LLM extraction path.
 
 `KeywordRetriever` remains the default retrieval implementation. It ranks
 only the supplied inspiration corpus using transparent keyword overlap and
-transferability. `RelevanceRetriever` makes a future semantic retriever
-possible without changing reasoning, but semantic/vector/LLM retrieval is
-not included. Retrieved objects are checked against the supplied corpus.
+transferability. `SemanticRetriever` is optional: it calculates cosine
+similarity over vectors supplied by an application-owned
+`EmbeddingProvider`. The repository does not include a hosted provider,
+model, vector database, or external AI dependency. Its
+`DeterministicTestEmbeddingProvider` is a local test/reference aid only,
+not production semantic intelligence.
+
+`HybridRetriever` is also opt-in. It combines a keyword-overlap score and
+semantic similarity using caller-configured weights, returning the separate
+components and combined score in `RetrievalMatch`. Every match preserves
+the source inspiration, source type, context, transferability, strategy,
+and score so a later cross-sector ranking phase can use the original
+metadata. Retrieved objects are checked against the supplied corpus.
+
+Neither a semantic score nor a hybrid score proves that two settings are
+equivalent, that a mechanism transfers, or that an intervention works. It
+only identifies a candidate inspiration for human contextual review.
 
 Pilot observation evidence remains a caller-supplied text basis in this
 phase. It is carried into learning records, but it is not yet a separate

@@ -23,9 +23,17 @@ from typing import Dict, List, Optional
 
 
 try:
-    from src.retrieval import KeywordRetriever, RelevanceRetriever
+    from src.retrieval import (
+        KeywordRetriever,
+        RelevanceRetriever,
+        RetrievalMatch,
+    )
 except ModuleNotFoundError:
-    from retrieval import KeywordRetriever, RelevanceRetriever
+    from retrieval import (
+        KeywordRetriever,
+        RelevanceRetriever,
+        RetrievalMatch,
+    )
 
 
 @dataclass
@@ -160,13 +168,25 @@ class InnovationInspirationEngine:
         Identify inspiration records that appear relevant
         to a problem.
 
-        Relevance is determined using transparent keyword
-        overlap across the problem, context and mechanism.
-
-        This is deliberately simple and model-independent.
-        A future AI retrieval layer can replace or extend
-        this ranking approach.
+        Relevance is determined by the configured retriever.
+        The default uses transparent keyword overlap; optional
+        strategies can return candidate inspirations with
+        explainable relevance metadata.
         """
+
+        return [
+            match.inspiration
+            for match in self.find_relevant_matches(problem, inspirations)
+        ]
+
+    def find_relevant_matches(
+        self,
+        problem: str,
+        inspirations: Optional[
+            List[InnovationInspiration]
+        ] = None,
+    ) -> List[RetrievalMatch]:
+        """Return validated retrieval metadata for candidate inspirations."""
 
         if not problem or not problem.strip():
             raise ValueError(
@@ -189,18 +209,47 @@ class InnovationInspirationEngine:
                     "of InnovationInspiration."
                 )
 
-        retrieved = self.retriever.retrieve(
-            problem=problem,
-            inspirations=inspirations,
-        )
+        retrieve_matches = getattr(self.retriever, "retrieve_matches", None)
+        if callable(retrieve_matches):
+            matches = retrieve_matches(
+                problem=problem,
+                inspirations=inspirations,
+            )
+        else:
+            retrieved = self.retriever.retrieve(
+                problem=problem,
+                inspirations=inspirations,
+            )
+            if not isinstance(retrieved, list):
+                raise TypeError("retriever must return a list of inspirations")
+            matches = []
+            for inspiration in retrieved:
+                if not isinstance(inspiration, InnovationInspiration):
+                    raise TypeError(
+                        "retriever results must be InnovationInspiration instances"
+                    )
+                matches.append(
+                    RetrievalMatch(
+                        inspiration=inspiration,
+                        strategy=self.retriever.__class__.__name__,
+                        score=0.0,
+                        source_type=inspiration.source_type,
+                        context=inspiration.context,
+                        transferability=inspiration.transferability,
+                    )
+                )
 
-        if not isinstance(retrieved, list):
-            raise TypeError("retriever must return a list of inspirations")
+        if not isinstance(matches, list):
+            raise TypeError("retriever must return a list of retrieval matches")
 
-        unique_retrieved = []
+        unique_matches = []
         seen_inspirations = set()
 
-        for inspiration in retrieved:
+        for match in matches:
+            if not isinstance(match, RetrievalMatch):
+                raise TypeError("retriever matches must be RetrievalMatch instances")
+
+            inspiration = match.inspiration
             if not isinstance(inspiration, InnovationInspiration):
                 raise TypeError(
                     "retriever results must be InnovationInspiration instances"
@@ -212,10 +261,10 @@ class InnovationInspirationEngine:
                 )
 
             if id(inspiration) not in seen_inspirations:
-                unique_retrieved.append(inspiration)
+                unique_matches.append(match)
                 seen_inspirations.add(id(inspiration))
 
-        return unique_retrieved
+        return unique_matches
 
     @staticmethod
     def _normalise_terms(
