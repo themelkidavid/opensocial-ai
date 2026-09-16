@@ -194,5 +194,30 @@ The current engine represents evidence, patterns, insights, hypotheses,
 experiments, and learning as different data types. An observed result
 from an inspiration or pilot is never automatically converted into a
 proven intervention. Experiment designs include safeguards and stop
-conditions, while validation learning requires a named human reviewer
-and remains exploratory.
+conditions, while validation learning requires a non-empty reviewer
+attribution and evidence basis, and remains exploratory. The system does
+not verify the reviewer identity or that a review occurred; organisations
+must establish and operate those human processes themselves.
+
+## Persistence, provenance, and auditability
+
+The optional SQLite store preserves evidence, experiment, observation, and
+learning records across sessions. Persistence does not change their
+meaning: stored evidence is not automatically true, a stored hypothesis is
+not a proven intervention, and stored learning remains exploratory.
+
+Provenance records factual fields supplied at entry: manual or imported
+method, optional source identifier, optional source reference, and import
+format. Provenance describes attribution, not truth, authority, consent,
+or suitability for a new purpose. Missing provenance remains unknown.
+
+Audit events record system state transitions. They are not approval,
+authorisation, independent verification of a reviewer, or permission to
+implement or scale an intervention. The organisation remains responsible
+for every real-world decision.
+
+Before using persistent storage with programme information, an
+organisation should set appropriate access controls, retention and deletion
+rules, backup and incident procedures, lawful data-handling practices, and
+a process for human/community review. Store only the minimum de-identified
+information needed for the documented purpose.

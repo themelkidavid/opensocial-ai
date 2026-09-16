@@ -22,6 +22,12 @@ from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional
 
 
+try:
+    from src.retrieval import KeywordRetriever, RelevanceRetriever
+except ModuleNotFoundError:
+    from retrieval import KeywordRetriever, RelevanceRetriever
+
+
 @dataclass
 class InnovationInspiration:
     """A documented source of inspiration for innovation."""
@@ -57,6 +63,19 @@ class InnovationInspirationEngine:
         "high",
         "exploratory",
     }
+
+    def __init__(
+        self,
+        retriever: Optional[RelevanceRetriever] = None,
+    ) -> None:
+        """Use the supplied retriever or deterministic keyword retrieval."""
+
+        self.retriever = (
+            retriever if retriever is not None else KeywordRetriever()
+        )
+
+        if not callable(getattr(self.retriever, "retrieve", None)):
+            raise TypeError("retriever must provide a retrieve method")
 
     def create(
         self,
@@ -159,12 +178,6 @@ class InnovationInspirationEngine:
         if not inspirations:
             return []
 
-        problem_terms = self._normalise_terms(
-            problem
-        )
-
-        scored = []
-
         for inspiration in inspirations:
 
             if not isinstance(
@@ -176,50 +189,33 @@ class InnovationInspirationEngine:
                     "of InnovationInspiration."
                 )
 
-            searchable_text = " ".join(
-                [
-                    inspiration.title,
-                    inspiration.context,
-                    inspiration.mechanism,
-                    inspiration.observed_result,
-                    inspiration.adaptation_notes,
-                ]
-            )
-
-            inspiration_terms = self._normalise_terms(
-                searchable_text
-            )
-
-            overlap = (
-                problem_terms
-                & inspiration_terms
-            )
-
-            score = len(overlap)
-
-            if score > 0:
-                scored.append(
-                    (
-                        score,
-                        self._transferability_score(
-                            inspiration.transferability
-                        ),
-                        inspiration,
-                    )
-                )
-
-        scored.sort(
-            key=lambda item: (
-                item[0],
-                item[1],
-            ),
-            reverse=True,
+        retrieved = self.retriever.retrieve(
+            problem=problem,
+            inspirations=inspirations,
         )
 
-        return [
-            item[2]
-            for item in scored
-        ]
+        if not isinstance(retrieved, list):
+            raise TypeError("retriever must return a list of inspirations")
+
+        unique_retrieved = []
+        seen_inspirations = set()
+
+        for inspiration in retrieved:
+            if not isinstance(inspiration, InnovationInspiration):
+                raise TypeError(
+                    "retriever results must be InnovationInspiration instances"
+                )
+
+            if not any(inspiration is candidate for candidate in inspirations):
+                raise ValueError(
+                    "retriever results must come from the supplied inspiration corpus"
+                )
+
+            if id(inspiration) not in seen_inspirations:
+                unique_retrieved.append(inspiration)
+                seen_inspirations.add(id(inspiration))
+
+        return unique_retrieved
 
     @staticmethod
     def _normalise_terms(
@@ -229,53 +225,7 @@ class InnovationInspirationEngine:
         Convert text into simple searchable terms.
         """
 
-        stop_words = {
-            "a",
-            "an",
-            "and",
-            "are",
-            "as",
-            "at",
-            "be",
-            "by",
-            "for",
-            "from",
-            "has",
-            "have",
-            "in",
-            "is",
-            "it",
-            "of",
-            "on",
-            "or",
-            "that",
-            "the",
-            "their",
-            "this",
-            "to",
-            "was",
-            "were",
-            "with",
-            "young",
-            "people",
-        }
-
-        words = (
-            text.lower()
-            .replace("-", " ")
-            .replace(",", " ")
-            .replace(".", " ")
-            .replace(":", " ")
-            .replace(";", " ")
-            .split()
-        )
-
-        return {
-            word
-            for word in words
-            if len(word) > 2
-            and word not in stop_words
-        }
+        return KeywordRetriever.normalise_terms(text)
 
     @staticmethod
     def _transferability_score(
@@ -283,14 +233,4 @@ class InnovationInspirationEngine:
     ) -> int:
         """Convert transferability into a ranking score."""
 
-        scores = {
-            "low": 1,
-            "exploratory": 2,
-            "moderate": 3,
-            "high": 4,
-        }
-
-        return scores.get(
-            transferability,
-            2,
-        )
+        return KeywordRetriever.transferability_score(transferability)

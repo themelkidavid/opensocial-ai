@@ -88,3 +88,8 @@ Learning
 Improved Intervention
       ↺
 ```
+
+Persistent, traceable institutional learning can help organisations retain
+context across pilots, but it remains subject to data governance and human
+and community oversight. Recorded learning is still exploratory rather than
+proof that an intervention should be implemented or scaled.

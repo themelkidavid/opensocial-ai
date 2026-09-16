@@ -82,6 +82,13 @@ try:
         ValidatedLearning,
     )
 
+    from src.persistence import (
+        EvidenceProvenance,
+        PersistenceStore,
+    )
+
+    from src.retrieval import RelevanceRetriever
+
 except ModuleNotFoundError:
 
     from evidence import EvidenceItem
@@ -135,6 +142,13 @@ except ModuleNotFoundError:
         ValidationObservation,
         ValidatedLearning,
     )
+
+    from persistence import (
+        EvidenceProvenance,
+        PersistenceStore,
+    )
+
+    from retrieval import RelevanceRetriever
 
 
 @dataclass
@@ -257,8 +271,14 @@ class InnovationDiscoveryEngine:
         Innovation Report
     """
 
-    def __init__(self) -> None:
-        """Initialise the analytical components."""
+    def __init__(
+        self,
+        storage: Optional[PersistenceStore] = None,
+        retriever: Optional[RelevanceRetriever] = None,
+    ) -> None:
+        """Initialise analytical components and optional persistence."""
+
+        self.storage = storage
 
         self.pattern_discovery = PatternDiscovery()
 
@@ -283,7 +303,7 @@ class InnovationDiscoveryEngine:
         )
 
         self.innovation_reasoning_engine = (
-            InnovationReasoningEngine()
+            InnovationReasoningEngine(retriever=retriever)
         )
 
         self.experiment_design_engine = (
@@ -300,6 +320,43 @@ class InnovationDiscoveryEngine:
         evidence: Optional[List[EvidenceItem]] = None,
         inspirations: Optional[
             List[InnovationInspiration]
+        ] = None,
+        evidence_provenance: Optional[
+            List[EvidenceProvenance]
+        ] = None,
+        validation_observations: Optional[
+            List[ValidationObservation]
+        ] = None,
+    ) -> InnovationReport:
+        """Analyse a problem and atomically persist a storage-backed run."""
+
+        if self.storage is None:
+            return self._analyse(
+                problem=problem,
+                evidence=evidence,
+                inspirations=inspirations,
+                evidence_provenance=evidence_provenance,
+                validation_observations=validation_observations,
+            )
+
+        with self.storage.transaction():
+            return self._analyse(
+                problem=problem,
+                evidence=evidence,
+                inspirations=inspirations,
+                evidence_provenance=evidence_provenance,
+                validation_observations=validation_observations,
+            )
+
+    def _analyse(
+        self,
+        problem: str,
+        evidence: Optional[List[EvidenceItem]] = None,
+        inspirations: Optional[
+            List[InnovationInspiration]
+        ] = None,
+        evidence_provenance: Optional[
+            List[EvidenceProvenance]
         ] = None,
         validation_observations: Optional[
             List[ValidationObservation]
@@ -319,7 +376,12 @@ class InnovationDiscoveryEngine:
         reasoning layer identify mechanisms that may be
         adapted to the current problem.
 
-        Human-reviewed validation observations can be supplied
+        When an optional PersistenceStore is configured, validated
+        evidence, generated experiment designs, reviewer-attributed
+        observations, and exploratory learning are stored. The default
+        remains a fully in-memory workflow.
+
+        Reviewer-attributed validation observations can be supplied
         from prior experiments. They are recorded as exploratory
         learning rather than proof that an intervention works.
         """
@@ -346,6 +408,19 @@ class InnovationDiscoveryEngine:
         self._validate_inspirations(
             inspirations
         )
+
+        evidence_provenance = self._validate_evidence_provenance(
+            evidence,
+            evidence_provenance,
+        )
+
+        if self.storage is not None:
+            stored_evidence = [
+                self.storage.save_evidence(item, provenance)
+                for item, provenance in zip(evidence, evidence_provenance)
+            ]
+        else:
+            stored_evidence = []
 
         evidence_profile = (
             self._build_evidence_profile(
@@ -526,11 +601,46 @@ class InnovationDiscoveryEngine:
             )
         )
 
+        if self.storage is not None:
+            analysis_evidence_ids = list(
+                dict.fromkeys(
+                    stored_record.evidence_id
+                    for stored_record in stored_evidence
+                )
+            )
+            experiment_designs = [
+                experiment_design.with_analysis_evidence_ids(
+                    analysis_evidence_ids
+                )
+                for experiment_design in experiment_designs
+            ]
+            experiment_designs = [
+                self.storage.save_experiment(experiment_design).experiment
+                for experiment_design in experiment_designs
+            ]
+
+            stored_observations = [
+                self.storage.record_observation(observation)
+                for observation in validation_observations
+            ]
+        else:
+            stored_observations = []
+
         validated_learning = (
             self.validation_learning_engine.evaluate(
                 validation_observations
             )
         )
+
+        if self.storage is not None:
+            for learning, stored_observation in zip(
+                validated_learning,
+                stored_observations,
+            ):
+                self.storage.save_learning(
+                    learning,
+                    stored_observation.observation_id,
+                )
 
         validation_questions = [
             "Do community members recognise this problem and its causes?",
@@ -646,6 +756,33 @@ class InnovationDiscoveryEngine:
                     "All inspirations must be instances "
                     "of InnovationInspiration."
                 )
+
+    @staticmethod
+    def _validate_evidence_provenance(
+        evidence: List[EvidenceItem],
+        provenance: Optional[List[EvidenceProvenance]],
+    ) -> List[Optional[EvidenceProvenance]]:
+        """Keep optional provenance aligned with the supplied evidence."""
+
+        if provenance is None:
+            return [None] * len(evidence)
+
+        if not isinstance(provenance, list):
+            raise TypeError("evidence_provenance must be a list")
+
+        if len(provenance) != len(evidence):
+            raise ValueError(
+                "evidence_provenance must align with every evidence item"
+            )
+
+        for item in provenance:
+            if not isinstance(item, EvidenceProvenance):
+                raise TypeError(
+                    "All provenance records must be instances of "
+                    "EvidenceProvenance."
+                )
+
+        return provenance
 
     @staticmethod
     def _build_evidence_profile(

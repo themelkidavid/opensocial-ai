@@ -101,7 +101,7 @@ class ValidationLearningEngine:
         observations = observations or []
 
         for observation in observations:
-            self._validate_observation(observation)
+            self.validate_observation(observation)
 
         return [
             self._build_learning(observation)
@@ -141,7 +141,7 @@ class ValidationLearningEngine:
         )
 
     @staticmethod
-    def _validate_observation(
+    def validate_observation(
         observation: ValidationObservation,
     ) -> None:
         """Validate every observation before it can become learning."""
@@ -187,3 +187,70 @@ class ValidationLearningEngine:
             raise ValueError(
                 "limitations must contain non-empty strings"
             )
+
+    @staticmethod
+    def validate_learning(
+        learning: ValidatedLearning,
+    ) -> None:
+        """Validate learning before it can be persisted as exploratory."""
+
+        if not isinstance(learning, ValidatedLearning):
+            raise TypeError(
+                "All learning records must be instances of "
+                "ValidatedLearning."
+            )
+
+        for field_name in (
+            "experiment_id",
+            "experiment_title",
+            "observed_outcome",
+            "reviewer",
+            "learning",
+            "confidence",
+            "next_step",
+        ):
+            value = getattr(learning, field_name)
+
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(
+                    f"{field_name} cannot be empty"
+                )
+
+        if learning.confidence != "exploratory":
+            raise ValueError(
+                "learning confidence must remain exploratory"
+            )
+
+        if (
+            not isinstance(learning.evidence_basis, list)
+            or not learning.evidence_basis
+            or not all(
+                isinstance(item, str) and item.strip()
+                for item in learning.evidence_basis
+            )
+        ):
+            raise ValueError(
+                "evidence_basis must contain non-empty strings"
+            )
+
+        if (
+            not isinstance(learning.limitations, list)
+            or not learning.limitations
+            or not all(
+                isinstance(item, str) and item.strip()
+                for item in learning.limitations
+            )
+        ):
+            raise ValueError(
+                "limitations must contain non-empty strings"
+            )
+
+        if not any(
+            "does not establish" in item.lower()
+            for item in learning.limitations
+        ):
+            raise ValueError(
+                "learning limitations must preserve the non-generalization safeguard"
+            )
+
+    _validate_observation = validate_observation

@@ -222,36 +222,94 @@ Evidence
   → Relevant inspirations and combinations
   → Testable innovation hypotheses
   → Structured experiment designs
-  → Human-reviewed validation observations
+  → Reviewer-attributed validation observations
   → Exploratory learning
 ```
 
 Each stage keeps a distinct output type. Evidence remains evidence;
 patterns are observations; insights and innovation opportunities remain
 interpretations; hypotheses and combinations remain unproven proposals;
-and learning remains exploratory even after a reviewed pilot outcome.
+and learning remains exploratory even after a caller-supplied pilot outcome
+with reviewer attribution.
 
 ### Innovation inspiration and combination
 
 An `InnovationInspiration` records a documented mechanism and its
-observed result in another context. The reasoning engine retrieves
-inspirations with transparent keyword overlap. When two or more sources
-are relevant and an innovation or transfer opportunity has a sufficient
-evidence basis, `InnovationCombinationEngine` can create a pairwise
-design hypothesis that preserves both mechanisms and their uncertainty. It
-does not treat either source result as proof that the combination will
-work locally.
+observed result in another context. `KeywordRetriever` is the default,
+using transparent keyword overlap. `RelevanceRetriever` is an extension
+point for a future retrieval strategy, but no semantic, vector, or LLM
+retrieval is implemented today. Retriever results must be supplied
+inspiration objects; retrieval cannot add a new undocumented source.
+
+When two or more sources are relevant and an innovation or transfer
+opportunity has a sufficient evidence basis, `InnovationCombinationEngine`
+can create a pairwise design hypothesis that preserves both mechanisms and
+their uncertainty. It does not treat either source result as proof that the
+combination will work locally.
 
 ### Experiments and validation
 
 `ExperimentDesignEngine` converts each innovation hypothesis into a
 small-pilot design with an intervention, comparison, measures,
 safeguards, and stop conditions. `ValidationLearningEngine` only creates
-learning from a caller-supplied, reviewer-attributed observation. It
-always labels that learning `exploratory` and explicitly cautions against
+learning from a caller-supplied observation with a reviewer attribution and
+evidence basis. It always labels that learning `exploratory` and explicitly
+cautions against
 assuming effectiveness elsewhere or at scale. Each experiment has a
 stable `experiment_id`, which validation observations preserve for
 traceability through serialized learning records.
+
+New experiment IDs fingerprint the complete hypothesis to avoid conflating
+different pilot designs. Consumers that independently stored serialized
+IDs from earlier in-memory versions must re-associate those legacy records
+explicitly; this initial persistence phase does not provide an automatic
+legacy-ID migration.
+
+### Optional persistence, ingestion, and auditability
+
+The in-memory workflow remains the default. Applications that need local,
+cross-session storage can pass the standard-library
+`SQLitePersistenceStore` to `InnovationDiscoveryEngine`. A SQLite-backed
+analysis run is atomic: if a later storage safeguard rejects the run, its
+writes and audit events are rolled back. Other `PersistenceStore`
+implementations may provide different transaction guarantees.
+
+`EvidenceIngestionAdapter` accepts deterministic local JSON records (an
+array or an object containing `records`) and CSV records. Both require
+`source_type` and `content`, then produce the existing `EvidenceItem` plus
+factual `EvidenceProvenance`: entry method, optional original source ID,
+optional source reference, and import format. Unknown provenance remains
+unknown. This phase deliberately does not include PDF/OCR extraction, web
+collection, external APIs, or model-based extraction.
+
+```python
+from src.evidence_ingestion import EvidenceIngestionAdapter
+from src.innovation_discovery import InnovationDiscoveryEngine
+from src.persistence import SQLitePersistenceStore
+
+records = EvidenceIngestionAdapter().from_json(json_payload)
+
+with SQLitePersistenceStore("opensocial-ai.sqlite3") as store:
+    report = InnovationDiscoveryEngine(storage=store).analyse(
+        "Young people face barriers to service access.",
+        evidence=[record.evidence for record in records],
+        evidence_provenance=[record.provenance for record in records],
+    )
+```
+
+Persisted experiments require known `analysis_evidence_ids`, which link the
+input analysis corpus to the design. That lineage is not a claim that every
+linked item directly supports the design or proves an intervention.
+SQLite enforces experiment → observation → learning references and records
+timestamps. An unknown experiment or observation is rejected rather than
+becoming trusted learning.
+
+Audit events record evidence creation/import, experiment creation and
+additional corpus lineage, observation recording and reviewer attribution,
+and learning generation. They are state-transition records, not approval,
+proof, or evidence that a named person actually completed a review. Pilot
+observation evidence remains a caller-supplied text basis in this phase;
+only the experiment analysis corpus has an ID-level evidence link.
 
 ## Responsible use
 
@@ -265,7 +323,8 @@ the engine with real programme information.
 ## Development
 
 OpenSocial AI currently has no external runtime dependencies. Python
-3.12 is used in CI.
+3.12 is used in CI; the optional SQLite store uses Python's built-in
+`sqlite3` module.
 
 Run the full test suite from the repository root:
 

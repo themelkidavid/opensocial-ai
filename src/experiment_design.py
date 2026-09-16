@@ -8,8 +8,9 @@ It records the evidence, uncertainty, safeguards, and human questions
 that should guide a decision to test a hypothesis.
 """
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field, replace
 import hashlib
+import json
 from typing import Dict, List, Optional
 
 
@@ -35,11 +36,23 @@ class ExperimentDesign:
     safeguards: List[str]
     stop_conditions: List[str]
     validation_question: str
+    analysis_evidence_ids: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         """Return the experiment design as a dictionary."""
 
         return asdict(self)
+
+    def with_analysis_evidence_ids(
+        self,
+        evidence_ids: List[str],
+    ) -> "ExperimentDesign":
+        """Return a copy linked to the persisted analysis evidence corpus."""
+
+        return replace(
+            self,
+            analysis_evidence_ids=list(evidence_ids),
+        )
 
 
 class ExperimentDesignEngine:
@@ -118,19 +131,14 @@ class ExperimentDesignEngine:
     def _experiment_id(
         hypothesis: InnovationHypothesis,
     ) -> str:
-        """Create a stable identifier from the hypothesis being tested."""
+        """Create a stable identifier from the complete tested hypothesis."""
 
-        identity = "\n".join(
-            [
-                hypothesis.title,
-                hypothesis.problem_connection,
-                hypothesis.underlying_mechanism,
-                *hypothesis.evidence_basis,
-            ]
+        identity = json.dumps(
+            hypothesis.to_dict(),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
         )
+        digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
-        digest = hashlib.sha256(
-            identity.encode("utf-8")
-        ).hexdigest()
-
-        return f"experiment-{digest[:16]}"
+        return f"experiment-{digest}"

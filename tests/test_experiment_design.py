@@ -58,6 +58,19 @@ class TestExperimentDesignEngine(unittest.TestCase):
             second_design.experiment_id,
         )
 
+    def test_experiment_identifier_distinguishes_different_hypotheses(self):
+        first_hypothesis = self._create_hypothesis()
+        second_hypothesis = self._create_hypothesis()
+        second_hypothesis.experiment = "Pilot a different peer-support design."
+
+        first_design = self.engine.design([first_hypothesis])[0]
+        second_design = self.engine.design([second_hypothesis])[0]
+
+        self.assertNotEqual(
+            first_design.experiment_id,
+            second_design.experiment_id,
+        )
+
     def test_empty_hypotheses_return_no_designs(self):
         self.assertEqual(self.engine.design([]), [])
 
@@ -81,6 +94,7 @@ class TestExperimentDesignEngine(unittest.TestCase):
             "safeguards",
             "stop_conditions",
             "validation_question",
+            "analysis_evidence_ids",
         ]
 
         for field in expected_fields:

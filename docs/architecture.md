@@ -75,6 +75,7 @@ following pipeline:
 
 | Stage | Component | Output |
 | --- | --- | --- |
+| Optional ingestion | `evidence_ingestion.py` | `ImportedEvidence` with `EvidenceProvenance` |
 | Evidence | `evidence.py` | `EvidenceItem` |
 | Pattern discovery | `pattern_discovery.py` | `ObservedPattern` |
 | Evidence gaps | `evidence_gap.py` | `EvidenceGap` |
@@ -83,9 +84,11 @@ following pipeline:
 | Insights | `insight_generation.py` | `InsightCandidate` |
 | Innovation opportunities | `innovation_opportunity.py` | `InnovationOpportunity` |
 | Inspiration | `innovation_inspiration.py` | `InnovationInspiration` |
+| Inspiration retrieval | `retrieval.py` | Ranked objects from the supplied inspiration corpus |
 | Reasoning and combination | `innovation_reasoning.py`, `innovation_combination.py` | `InnovationHypothesis` |
 | Experiment design | `experiment_design.py` | `ExperimentDesign` |
 | Validation and learning | `validation_learning.py` | `ValidationObservation`, `ValidatedLearning` |
+| Optional persistence and audit | `persistence.py` | Stored records and `AuditEvent` |
 
 `InnovationDiscoveryEngine` orchestrates the pipeline and returns an
 `InnovationReport`. Experiment designs are made only from generated
@@ -97,3 +100,73 @@ creates a claimed outcome from a hypothesis or experiment design. An
 The baseline uses transparent rules and keyword overlap, not machine
 learning. All stage outputs are dataclasses with serializable evidence,
 confidence, uncertainty, and investigation fields where appropriate.
+
+## Optional persistence, provenance, and auditability
+
+`SQLitePersistenceStore` is an opt-in, standard-library `sqlite3`
+implementation of the small `PersistenceStore` boundary. It keeps the
+domain engines independent of SQLite; without a store,
+`InnovationDiscoveryEngine` continues to operate entirely in memory.
+
+The SQLite schema stores evidence records, experiment designs,
+reviewer-attributed observations, exploratory learning records, and audit
+events. Structured fields are serialized as JSON. Evidence has a stable
+content-and-provenance ID and timestamp; experiment IDs are derived from
+the complete hypothesis; observations and learning have stable IDs and
+timestamps.
+
+For a persisted experiment, `analysis_evidence_ids` must name known,
+unique evidence records. The `experiment_evidence` association preserves
+an append-only lineage order, so prior links cannot be reordered or
+removed. When a design is saved again, the repository keeps its first
+recorded order and appends only previously unseen evidence IDs; reordered
+or omitted caller IDs do not rewrite history. This is lineage, not an
+assertion that every linked item directly supports the design or proves
+effectiveness. SQLite enforces the other traceability links:
+
+```text
+Persisted analysis evidence ──analysis-corpus lineage──► Experiment design
+                                                        │
+                                                        ▼
+                                                Validation observation
+                                                        │
+                                                        ▼
+                                                Exploratory learning
+```
+
+An observation for an unknown experiment, or learning for an unknown or
+non-matching observation, is rejected. A SQLite-backed call to
+`InnovationDiscoveryEngine.analyse()` runs in one transaction, so a later
+rejection rolls back that call's writes and audit events. Custom
+`PersistenceStore` implementations may define their own transaction
+guarantees. SQLite serializes writers while it makes an idempotent storage
+decision; it is not a multi-writer service. Applications that run long
+analyses concurrently should coordinate writers or handle SQLite busy-timeout
+retries.
+
+`AuditEvent` records state transitions such as evidence creation/import,
+experiment creation, additional analysis-corpus lineage, observation
+recording, reviewer attribution, and learning generation. The audit trail
+does not authorize a real-world action, prove an intervention, or verify a
+reviewer's identity or that review occurred.
+
+## Ingestion and retrieval boundaries
+
+`EvidenceIngestionAdapter` safely parses local JSON (a record array or an
+object with a `records` array) and CSV. Both formats require `source_type`
+and `content`; optional source fields are preserved without invented
+values. An imported record carries factual `EvidenceProvenance`: it was
+imported, its optional original source identifier, optional source
+reference, and format. The adapter intentionally has no PDF/OCR, web,
+external API, or LLM extraction path.
+
+`KeywordRetriever` remains the default retrieval implementation. It ranks
+only the supplied inspiration corpus using transparent keyword overlap and
+transferability. `RelevanceRetriever` makes a future semantic retriever
+possible without changing reasoning, but semantic/vector/LLM retrieval is
+not included. Retrieved objects are checked against the supplied corpus.
+
+Pilot observation evidence remains a caller-supplied text basis in this
+phase. It is carried into learning records, but it is not yet a separate
+evidence-ID association; do not mistake that text for referential evidence
+provenance.

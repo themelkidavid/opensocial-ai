@@ -45,6 +45,7 @@ try:
         InnovationInspiration,
         InnovationInspirationEngine,
     )
+    from src.retrieval import RelevanceRetriever
 except ModuleNotFoundError:
     from innovation_combination import (
         InnovationCombination,
@@ -54,6 +55,7 @@ except ModuleNotFoundError:
         InnovationInspiration,
         InnovationInspirationEngine,
     )
+    from retrieval import RelevanceRetriever
 
 
 @dataclass
@@ -86,11 +88,14 @@ class InnovationReasoningEngine:
     or combine opportunities with relevant inspiration sources.
     """
 
-    def __init__(self) -> None:
-        """Initialise the inspiration retrieval and combination components."""
+    def __init__(
+        self,
+        retriever: Optional[RelevanceRetriever] = None,
+    ) -> None:
+        """Initialise retrieval and combination components."""
 
         self.inspiration_engine = (
-            InnovationInspirationEngine()
+            InnovationInspirationEngine(retriever=retriever)
         )
         self.combination_engine = (
             InnovationCombinationEngine()
