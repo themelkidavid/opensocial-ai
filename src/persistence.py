@@ -29,6 +29,7 @@ try:
     from src.historical_memory import HistoricalProgramme, MechanismRecord
     from src.outcome_metrics import ComparativeLearningEngine, OutcomeMetric, OutcomeObservation
     from src.portfolio_learning import ProgrammePortfolio
+    from src.strategic_scenarios import StrategicScenario
 except ModuleNotFoundError:
     from evidence import EvidenceItem, create_evidence
     from experiment_design import ExperimentDesign
@@ -40,6 +41,7 @@ except ModuleNotFoundError:
     from historical_memory import HistoricalProgramme, MechanismRecord
     from outcome_metrics import ComparativeLearningEngine, OutcomeMetric, OutcomeObservation
     from portfolio_learning import ProgrammePortfolio
+    from strategic_scenarios import StrategicScenario
 
 
 @dataclass
@@ -1086,6 +1088,34 @@ class SQLitePortfolioRepository:
         for pattern in patterns: self._audit_events.record("portfolio_pattern_generated","portfolio",portfolio_id,"A descriptive portfolio pattern was generated.",{"pattern_type":pattern.pattern_type})
         for opportunity in opportunities: self._audit_events.record("strategy_opportunity_generated","portfolio",portfolio_id,"An exploratory strategy opportunity was generated; it is not a recommendation.",{"pattern_type":opportunity.pattern_type})
 
+class SQLiteScenarioRepository:
+    def __init__(self, connection, historical, audit_events): self._connection,self._historical,self._audit_events=connection,historical,audit_events
+    def save(self, scenario):
+        scenario=scenario.validated()
+        for pid in scenario.programme_ids:
+            if self._historical.get_programme(pid) is None: raise ValueError("Unknown programme_id")
+        for mid in scenario.mechanism_ids:
+            if self._historical.get_mechanism(mid) is None: raise ValueError("Unknown mechanism_id")
+        with _write_transaction(self._connection):
+            row=self._connection.execute("SELECT payload_json FROM strategic_scenarios WHERE scenario_id=?",(scenario.scenario_id,)).fetchone()
+            if row: return StrategicScenario(**_load_mapping(row["payload_json"]))
+            self._connection.execute("INSERT INTO strategic_scenarios VALUES (?,?,?)",(scenario.scenario_id,_dump_json(scenario.to_dict()),_timestamp()))
+            self._audit_events._record("scenario_generated","scenario",scenario.scenario_id,"An exploratory scenario was generated; it is not a recommendation or prediction.",{})
+            self._audit_events._record("scenario_stored","scenario",scenario.scenario_id,"Scenario metadata was stored.",{})
+            if scenario.potential_experiment: self._audit_events._record("scenario_linked_to_experiment_concept","scenario",scenario.scenario_id,"An experiment concept was linked; human approval remains required.",{})
+        return scenario
+    def get(self, sid):
+        row=self._connection.execute("SELECT payload_json FROM strategic_scenarios WHERE scenario_id=?",(sid,)).fetchone(); return StrategicScenario(**_load_mapping(row["payload_json"])) if row else None
+    def list(self): return [self.get(r["scenario_id"]) for r in self._connection.execute("SELECT scenario_id FROM strategic_scenarios ORDER BY created_at")]
+    def update_review_status(self,sid,status):
+        scenario=self.get(sid)
+        if scenario is None: raise ValueError("Unknown scenario_id")
+        updated=StrategicScenario(**{**scenario.to_dict(),"review_status":status}).validated()
+        with _write_transaction(self._connection):
+            self._connection.execute("UPDATE strategic_scenarios SET payload_json=? WHERE scenario_id=?",(_dump_json(updated.to_dict()),sid)); self._audit_events._record("scenario_review_status_changed","scenario",sid,"Scenario review status changed as governance metadata; it does not establish effectiveness.",{"review_status":status})
+        return updated
+    def record_comparison(self, scenario_ids): self._audit_events.record("scenario_compared","scenario",scenario_ids[0] if scenario_ids else "none","Scenarios were compared descriptively; no ranking was produced.",{})
+
 
 class SQLitePersistenceStore(PersistenceStore):
     """Optional SQLite implementation of the persistence-store interface."""
@@ -1121,6 +1151,7 @@ class SQLitePersistenceStore(PersistenceStore):
             self._connection, self.experiments, self.audit_events
         )
         self.portfolios = SQLitePortfolioRepository(self._connection,self.historical,self.experiments,self.audit_events)
+        self.scenarios = SQLiteScenarioRepository(self._connection,self.historical,self.audit_events)
 
     def save_evidence(
         self,
@@ -1175,6 +1206,7 @@ class SQLitePersistenceStore(PersistenceStore):
         return self.outcomes.compare(observation_a, observation_b)
 
     def save_portfolio(self, portfolio: ProgrammePortfolio): return self.portfolios.save(portfolio)
+    def save_scenario(self, scenario: StrategicScenario): return self.scenarios.save(scenario)
 
     @contextmanager
     def transaction(self):
@@ -1354,6 +1386,9 @@ class SQLitePersistenceStore(PersistenceStore):
                 );
                 CREATE TABLE IF NOT EXISTS portfolios (
                     portfolio_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS strategic_scenarios (
+                    scenario_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL, created_at TEXT NOT NULL
                 );
                 """
             )

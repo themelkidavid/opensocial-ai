@@ -91,6 +91,7 @@ following pipeline:
 | Experiment design | `experiment_design.py` | `ExperimentDesign` |
 | Outcome measurement | `outcome_metrics.py` | Caller-defined metrics, reviewed observations, and cautious comparisons |
 | Portfolio learning | `portfolio_learning.py` | Context-preserving patterns and exploratory strategy opportunities |
+| Strategic scenarios | `strategic_scenarios.py` | Exploratory scenarios, comparison, review lifecycle, and optional experiment concepts |
 | Validation and learning | `validation_learning.py` | `ValidationObservation`, `ValidatedLearning` |
 | Optional persistence and audit | `persistence.py` | Stored records and `AuditEvent` |
 

@@ -208,6 +208,10 @@ patterns preserve evidence thresholds and context differences. Strategy
 opportunities are investigative questions requiring human approval, not policy
 or intervention recommendations.
 
+## Strategic scenarios
+
+Scenarios preserve evidence attribution, assumptions, uncertainty, and expected learning rather than predicting results. Review states—`exploratory`, `reviewed`, `approved_for_experiment_design`, `rejected`, and `archived`—are governance metadata only. A reviewed or approved scenario is not proven effective; a historical precedent is not an expected future outcome; cross-sector similarity is not transferability; and human approval is not evidence of success.
+
 The current engine represents evidence, patterns, insights, hypotheses,
 experiments, and learning as different data types. An observed result
 from an inspiration or pilot is never automatically converted into a

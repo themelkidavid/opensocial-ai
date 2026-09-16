@@ -310,6 +310,10 @@ Portfolio learning describes mechanism recurrence, evidence gaps, context and
 measurement differences without ranking programmes or inferring effectiveness.
 Its strategy opportunities are questions for human investigation, not recommendations.
 
+### Strategic scenarios
+
+`StrategicScenarioEngine` creates deterministic, evidence-attributed exploratory scenarios from portfolio patterns. It preserves assumptions, uncertainties, expected learning, provenance, and an optional experiment concept. Scenarios are not recommendations or predictions; SQLite persistence and audit events record their review lifecycle.
+
 ### Optional persistence, ingestion, and auditability
 
 The in-memory workflow remains the default. Applications that need local,
