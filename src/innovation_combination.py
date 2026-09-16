@@ -37,6 +37,10 @@ class InnovationCombination:
     uncertainty: List[str]
     experiment: str
     validation_question: str
+    source_sector_a: Optional[str] = None
+    source_sector_b: Optional[str] = None
+    provenance_source_id_a: Optional[str] = None
+    provenance_source_id_b: Optional[str] = None
 
     def to_dict(self) -> Dict:
         """Return the combination as a dictionary."""
@@ -200,4 +204,8 @@ class InnovationCombinationEngine:
             uncertainty=uncertainty,
             experiment=experiment,
             validation_question=validation_question,
+            source_sector_a=inspiration_a.sector,
+            source_sector_b=inspiration_b.sector,
+            provenance_source_id_a=inspiration_a.provenance_source_id,
+            provenance_source_id_b=inspiration_b.provenance_source_id,
         )

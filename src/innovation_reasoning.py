@@ -46,6 +46,7 @@ try:
         InnovationInspirationEngine,
     )
     from src.retrieval import RelevanceRetriever
+    from src.cross_sector_discovery import CrossSectorCandidate
 except ModuleNotFoundError:
     from innovation_combination import (
         InnovationCombination,
@@ -56,6 +57,7 @@ except ModuleNotFoundError:
         InnovationInspirationEngine,
     )
     from retrieval import RelevanceRetriever
+    from cross_sector_discovery import CrossSectorCandidate
 
 
 @dataclass
@@ -108,6 +110,9 @@ class InnovationReasoningEngine:
         inspirations: Optional[
             List[InnovationInspiration]
         ] = None,
+        cross_sector_candidates: Optional[
+            List[CrossSectorCandidate]
+        ] = None,
     ) -> List[InnovationHypothesis]:
         """
         Generate innovation hypotheses.
@@ -126,6 +131,7 @@ class InnovationReasoningEngine:
 
         opportunities = opportunities or []
         inspirations = inspirations or []
+        cross_sector_candidates = cross_sector_candidates or []
 
         if not opportunities:
             return []
@@ -133,6 +139,11 @@ class InnovationReasoningEngine:
         self._validate_inspirations(
             inspirations
         )
+        self._validate_cross_sector_candidates(cross_sector_candidates)
+        inspirations = list(inspirations)
+        for candidate in cross_sector_candidates:
+            if not any(candidate.inspiration is item for item in inspirations):
+                inspirations.append(candidate.inspiration)
 
         relevant_inspirations = []
 
@@ -263,8 +274,16 @@ class InnovationReasoningEngine:
         )
         evidence_basis.extend(
             [
-                f"Inspiration source: {combination.inspiration_a}",
-                f"Inspiration source: {combination.inspiration_b}",
+                _combination_source_detail(
+                    combination.inspiration_a,
+                    combination.source_sector_a,
+                    combination.provenance_source_id_a,
+                ),
+                _combination_source_detail(
+                    combination.inspiration_b,
+                    combination.source_sector_b,
+                    combination.provenance_source_id_b,
+                ),
             ]
         )
 
@@ -283,7 +302,9 @@ class InnovationReasoningEngine:
             inspiration_source=(
                 f"combined inspirations: "
                 f"{combination.inspiration_a}; "
-                f"{combination.inspiration_b}"
+                f"{combination.inspiration_b}; "
+                f"source sectors: {combination.source_sector_a or 'unknown'}, "
+                f"{combination.source_sector_b or 'unknown'}"
             ),
             underlying_mechanism=combination.combined_mechanism,
             novel_combination=combination.description,
@@ -350,6 +371,12 @@ class InnovationReasoningEngine:
                 f"{inspiration.source_type} inspiration: "
                 f"{inspiration.title}"
             )
+            if inspiration.sector:
+                inspiration_source += f" (source sector: {inspiration.sector})"
+            if inspiration.provenance_source_id:
+                inspiration_source += (
+                    f"; provenance source: {inspiration.provenance_source_id}"
+                )
 
             underlying_mechanism = (
                 f"Adapt the mechanism used in "
@@ -379,6 +406,14 @@ class InnovationReasoningEngine:
 
             evidence_basis.append(
                 f"Inspiration source: {inspiration.title}"
+            )
+            if inspiration.provenance_source_id:
+                evidence_basis.append(
+                    f"Inspiration provenance: {inspiration.provenance_source_id}"
+                )
+            uncertainty.append(
+                "The documented mechanism is a candidate for adaptation and "
+                "requires contextual review and testing."
             )
 
             evidence_basis.append(
@@ -723,3 +758,28 @@ class InnovationReasoningEngine:
                     "All inspirations must be instances "
                     "of InnovationInspiration."
                 )
+
+    @staticmethod
+    def _validate_cross_sector_candidates(
+        candidates: List[CrossSectorCandidate],
+    ) -> None:
+        """Accept only structured candidates produced by discovery."""
+
+        for candidate in candidates:
+            if not isinstance(candidate, CrossSectorCandidate):
+                raise TypeError(
+                    "All cross-sector candidates must be CrossSectorCandidate instances."
+                )
+
+
+def _combination_source_detail(
+    title: str,
+    sector: Optional[str],
+    provenance_source_id: Optional[str],
+) -> str:
+    """Keep combination source sector and provenance visible in its basis."""
+
+    detail = f"Inspiration source: {title}; sector: {sector or 'unknown'}"
+    if provenance_source_id:
+        detail += f"; provenance: {provenance_source_id}"
+    return detail

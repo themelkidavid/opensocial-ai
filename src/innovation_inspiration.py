@@ -47,6 +47,11 @@ class InnovationInspiration:
     observed_result: str
     transferability: str = "exploratory"
     adaptation_notes: str = ""
+    sector: Optional[str] = None
+    geography: Optional[str] = None
+    target_population: Optional[str] = None
+    provenance_source_id: Optional[str] = None
+    provenance_reference: Optional[str] = None
 
     def to_dict(self) -> Dict:
         """Return the inspiration as a dictionary."""
@@ -94,6 +99,11 @@ class InnovationInspirationEngine:
         observed_result: str,
         transferability: str = "exploratory",
         adaptation_notes: str = "",
+        sector: Optional[str] = None,
+        geography: Optional[str] = None,
+        target_population: Optional[str] = None,
+        provenance_source_id: Optional[str] = None,
+        provenance_reference: Optional[str] = None,
     ) -> InnovationInspiration:
         """
         Create a validated innovation inspiration record.
@@ -143,6 +153,17 @@ class InnovationInspirationEngine:
                 f"{transferability}"
             )
 
+        metadata = {
+            "sector": sector,
+            "geography": geography,
+            "target_population": target_population,
+            "provenance_source_id": provenance_source_id,
+            "provenance_reference": provenance_reference,
+        }
+        for name, value in metadata.items():
+            if value is not None and not isinstance(value, str):
+                raise TypeError(f"{name} must be text or None")
+
         return InnovationInspiration(
             source_type=source_type,
             title=title.strip(),
@@ -154,6 +175,23 @@ class InnovationInspirationEngine:
                 adaptation_notes.strip()
                 if adaptation_notes
                 else ""
+            ),
+            sector=sector.strip().lower() if sector and sector.strip() else None,
+            geography=geography.strip() if geography and geography.strip() else None,
+            target_population=(
+                target_population.strip()
+                if target_population and target_population.strip()
+                else None
+            ),
+            provenance_source_id=(
+                provenance_source_id.strip()
+                if provenance_source_id and provenance_source_id.strip()
+                else None
+            ),
+            provenance_reference=(
+                provenance_reference.strip()
+                if provenance_reference and provenance_reference.strip()
+                else None
             ),
         )
 

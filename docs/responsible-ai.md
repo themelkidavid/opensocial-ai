@@ -237,3 +237,18 @@ or scale an intervention. A local deterministic provider exists solely for
 testing/reference use and must not be represented as production-quality
 semantic intelligence. Human and community review remain required before
 any adaptation or pilot decision.
+
+## Cross-sector discovery
+
+Cross-sector discovery identifies potentially relevant mechanisms from the
+supplied inspiration corpus. A different sector, geography, source type, or
+international source is not evidence that a mechanism transfers or works
+locally. A configurable diversity boost changes candidate ordering only; it
+does not make cross-sector sources inherently better and does not hide
+same-sector sources.
+
+Each candidate keeps documented source/provenance metadata, retrieval basis,
+transferability status, uncertainty, and questions for human adaptation
+review. These questions are prompts for investigation, not conclusions or
+approval to act. Evidence gaps, contradictions, community oversight, and
+bounded testing safeguards continue to take priority.

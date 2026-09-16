@@ -252,6 +252,17 @@ means only that a source is potentially relevant; it is not causal evidence,
 proof of transferability, contextual equivalence, or a recommended
 intervention.
 
+### Cross-sector discovery
+
+`CrossSectorDiscoveryEngine` turns retriever matches into explicit candidate
+inspirations. It compares documented mechanisms, not sector labels alone,
+and preserves optional sector, geography, target population, and provenance
+metadata from `InnovationInspiration`. A caller may prefer cross-sector
+candidates with a transparent, configurable ranking boost; same-sector
+candidates remain visible. Every result includes adaptation questions and
+uncertainty: sector difference and retrieval similarity do not establish
+transferability or effectiveness.
+
 When two or more sources are relevant and an innovation or transfer
 opportunity has a sufficient evidence basis, `InnovationCombinationEngine`
 can create a pairwise design hypothesis that preserves both mechanisms and

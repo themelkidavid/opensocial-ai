@@ -85,6 +85,7 @@ following pipeline:
 | Innovation opportunities | `innovation_opportunity.py` | `InnovationOpportunity` |
 | Inspiration | `innovation_inspiration.py` | `InnovationInspiration` |
 | Inspiration retrieval | `retrieval.py` | Keyword, optional semantic, or optional hybrid matches from the supplied inspiration corpus |
+| Cross-sector discovery | `cross_sector_discovery.py` | Mechanism-based candidate inspirations with adaptation questions |
 | Reasoning and combination | `innovation_reasoning.py`, `innovation_combination.py` | `InnovationHypothesis` |
 | Experiment design | `experiment_design.py` | `ExperimentDesign` |
 | Validation and learning | `validation_learning.py` | `ValidationObservation`, `ValidatedLearning` |
@@ -179,6 +180,15 @@ metadata. Retrieved objects are checked against the supplied corpus.
 Neither a semantic score nor a hybrid score proves that two settings are
 equivalent, that a mechanism transfers, or that an intervention works. It
 only identifies a candidate inspiration for human contextual review.
+
+`CrossSectorDiscoveryEngine` consumes the same retriever interface and
+creates `CrossSectorCandidate` records. It preserves source sector, target
+sector, source type, mechanism, provenance fields, retrieval strategy and
+score. `prefer_cross_sector` may add a configured diversity boost only when
+both sectors are known and differ; it never removes same-sector candidates
+or treats difference as evidence of usefulness. Ties preserve retriever
+order. Candidate records explicitly state uncertainty and adaptation
+questions before any reasoning or pilot decision.
 
 Pilot observation evidence remains a caller-supplied text basis in this
 phase. It is carried into learning records, but it is not yet a separate

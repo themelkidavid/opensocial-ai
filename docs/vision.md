@@ -93,3 +93,8 @@ Persistent, traceable institutional learning can help organisations retain
 context across pilots, but it remains subject to data governance and human
 and community oversight. Recorded learning is still exploratory rather than
 proof that an intervention should be implemented or scaled.
+
+Cross-sector discovery can broaden the set of candidate mechanisms that
+communities and practitioners investigate. It should support learning across
+contexts without erasing local knowledge: transfer remains exploratory,
+adaptation is required, and decisions remain with people and communities.
