@@ -31,6 +31,7 @@ try:
     from src.portfolio_learning import ProgrammePortfolio
     from src.strategic_scenarios import StrategicScenario
     from src.governance import GovernanceReview, DecisionRecord, ExperimentAuthorization
+    from src.decision_briefs import EvidencePack, DecisionBrief
 except ModuleNotFoundError:
     from evidence import EvidenceItem, create_evidence
     from experiment_design import ExperimentDesign
@@ -44,6 +45,7 @@ except ModuleNotFoundError:
     from portfolio_learning import ProgrammePortfolio
     from strategic_scenarios import StrategicScenario
     from governance import GovernanceReview, DecisionRecord, ExperimentAuthorization
+    from decision_briefs import EvidencePack, DecisionBrief
 
 
 @dataclass
@@ -1169,6 +1171,26 @@ class SQLiteGovernanceRepository:
   reviews=self.list_reviews_by_subject(typ,sid); decisions=self.list_decisions(typ,sid); active=self.get_active_decision(typ,sid); auths=self.list_authorizations_by_scenario(sid) if typ=="strategic_scenario" else []
   return {"subject_type":typ,"subject_id":sid,"evidence_references":[x for d in decisions for x in d.evidence_basis],"reviews":[r.to_dict() for r in reviews],"concerns":[x for r in reviews for x in r.concerns],"unresolved_questions":[x for r in reviews for x in r.unresolved_questions],"alternatives":[x for d in decisions for x in d.alternatives_considered],"dissent_or_reservations":[x for d in decisions for x in d.dissent_or_reservations],"decision_history":[d.to_dict() for d in decisions],"active_decision":active.to_dict() if active else None,"authorizations":[a.to_dict() for a in auths]}
 
+class SQLiteDecisionBriefRepository:
+ def __init__(self, connection, audit_events): self._connection,self._audit_events=connection,audit_events
+ def save_pack(self, pack):
+  pack=pack.finalized(); self._connection.execute("INSERT OR IGNORE INTO evidence_packs VALUES (?,?,?,?)",(pack.pack_id,pack.subject_type,pack.subject_id,_dump_json(pack.to_dict()))); self._connection.commit(); self._audit_events.record("evidence_pack_generated","evidence_pack",pack.pack_id,"Evidence pack snapshot was generated from supplied records.",{"subject_type":pack.subject_type,"subject_id":pack.subject_id}); self._audit_events.record("evidence_pack_stored","evidence_pack",pack.pack_id,"Evidence pack snapshot was stored.",{"subject_type":pack.subject_type,"subject_id":pack.subject_id}); return pack
+ def get_pack(self, pack_id):
+  row=self._connection.execute("SELECT payload_json FROM evidence_packs WHERE pack_id=?",(pack_id,)).fetchone(); return EvidencePack(**_load_mapping(row["payload_json"])) if row else None
+ def list_packs(self, subject_type, subject_id): return [EvidencePack(**_load_mapping(r["payload_json"])) for r in self._connection.execute("SELECT payload_json FROM evidence_packs WHERE subject_type=? AND subject_id=? ORDER BY pack_id",(subject_type,subject_id))]
+ def save_brief(self, brief):
+  brief=brief.finalized()
+  if self.get_brief(brief.brief_id): raise ValueError("brief_id already exists")
+  version=self._connection.execute("SELECT COALESCE(MAX(brief_version),0)+1 AS version FROM decision_briefs WHERE subject_type=? AND subject_id=?",(brief.subject_type,brief.subject_id)).fetchone()["version"]
+  if brief.brief_version not in (1,version): raise ValueError("brief_version must be next for subject")
+  brief=DecisionBrief(**{**brief.to_dict(),"brief_version":version})
+  self._connection.execute("INSERT INTO decision_briefs VALUES (?,?,?,?,?)",(brief.brief_id,brief.subject_type,brief.subject_id,version,_dump_json(brief.to_dict()))); self._connection.commit(); self._audit_events.record("decision_brief_generated","decision_brief",brief.brief_id,"Decision brief snapshot was generated; it is not a decision.",{"subject_type":brief.subject_type,"subject_id":brief.subject_id,"version":version}); self._audit_events.record("decision_brief_version_created","decision_brief",brief.brief_id,"Decision brief snapshot was stored; it is not a decision.",{"subject_type":brief.subject_type,"subject_id":brief.subject_id,"version":version}); return brief
+ def get_brief(self, brief_id):
+  row=self._connection.execute("SELECT payload_json FROM decision_briefs WHERE brief_id=?",(brief_id,)).fetchone(); return DecisionBrief(**_load_mapping(row["payload_json"])) if row else None
+ def list_briefs(self, subject_type, subject_id): return [DecisionBrief(**_load_mapping(r["payload_json"])) for r in self._connection.execute("SELECT payload_json FROM decision_briefs WHERE subject_type=? AND subject_id=? ORDER BY brief_version",(subject_type,subject_id))]
+ def latest(self, subject_type, subject_id):
+  row=self._connection.execute("SELECT payload_json FROM decision_briefs WHERE subject_type=? AND subject_id=? ORDER BY brief_version DESC LIMIT 1",(subject_type,subject_id)).fetchone(); return DecisionBrief(**_load_mapping(row["payload_json"])) if row else None
+
 
 class SQLitePersistenceStore(PersistenceStore):
     """Optional SQLite implementation of the persistence-store interface."""
@@ -1206,6 +1228,7 @@ class SQLitePersistenceStore(PersistenceStore):
         self.portfolios = SQLitePortfolioRepository(self._connection,self.historical,self.experiments,self.audit_events)
         self.scenarios = SQLiteScenarioRepository(self._connection,self.historical,self.audit_events)
         self.governance = SQLiteGovernanceRepository(self._connection,self.scenarios,self.audit_events)
+        self.briefs = SQLiteDecisionBriefRepository(self._connection,self.audit_events)
 
     def save_evidence(
         self,
@@ -1261,6 +1284,14 @@ class SQLitePersistenceStore(PersistenceStore):
 
     def save_portfolio(self, portfolio: ProgrammePortfolio): return self.portfolios.save(portfolio)
     def save_scenario(self, scenario: StrategicScenario): return self.scenarios.save(scenario)
+    def save_evidence_pack(self, pack: EvidencePack): return self.briefs.save_pack(pack)
+    def get_evidence_pack(self, pack_id): return self.briefs.get_pack(pack_id)
+    def list_evidence_packs_by_subject(self, subject_type, subject_id): return self.briefs.list_packs(subject_type,subject_id)
+    def save_decision_brief(self, brief: DecisionBrief): return self.briefs.save_brief(brief)
+    def get_decision_brief(self, brief_id): return self.briefs.get_brief(brief_id)
+    def list_decision_briefs_by_subject(self, subject_type, subject_id): return self.briefs.list_briefs(subject_type,subject_id)
+    def list_decision_brief_versions(self, subject_type, subject_id): return self.briefs.list_briefs(subject_type,subject_id)
+    def get_latest_decision_brief(self, subject_type, subject_id): return self.briefs.latest(subject_type,subject_id)
 
     @contextmanager
     def transaction(self):
@@ -1447,6 +1478,8 @@ class SQLitePersistenceStore(PersistenceStore):
                 CREATE TABLE IF NOT EXISTS governance_reviews (review_id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, payload_json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS governance_decisions (decision_id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, payload_json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS experiment_authorizations (authorization_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, scenario_id TEXT NOT NULL, payload_json TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS evidence_packs (pack_id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, payload_json TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS decision_briefs (brief_id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, brief_version INTEGER NOT NULL, payload_json TEXT NOT NULL);
                 """
             )
 
