@@ -379,6 +379,15 @@ interpretation is not truth, a recommendation, a strategy choice, an
 authorization, or evidence of effectiveness; explicit human review remains
 separate.
 
+The optional `OpenAIInterpretationProvider` lives outside the core reasoning
+modules. Install it explicitly with `python -m pip install -r
+requirements-openai.txt`, set `OPENAI_API_KEY`, and optionally set
+`OPENAI_INTERPRETATION_MODEL`. It uses the Responses API but still returns
+only untrusted structured output for the existing grounding validator. The
+manual fictional-evidence smoke script is `examples/openai_interpretation_smoke_test.py`.
+Pilot #2 uses its local fixture by default; `OPENAI_INTERPRETATION_ENABLED=1`
+is an explicit, manual opt-in for a small live interpretation subset.
+
 Use the engine to structure inquiry, not to automate social-sector
 decisions. Review every output with affected communities and appropriate
 programme, safeguarding, and subject-matter practitioners. Supply only

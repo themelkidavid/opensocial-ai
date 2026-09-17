@@ -169,6 +169,15 @@ deterministic narrative pass continues. Assisted records remain separate from
 deterministic claims and are never automatically promoted into inspirations,
 mechanisms, strategies, or governance objects.
 
+`src.providers.openai_interpretation.OpenAIInterpretationProvider` is an
+optional adapter, not a core dependency. It lazily imports the official SDK,
+uses a constructor-configurable model and the Responses API, and translates
+machine-readable output into `InterpretationResponse`. The same
+provider-neutral validator remains mandatory after parsing. The adapter sends
+only `InterpretationRequest` content, retains safe provider/model metadata,
+and converts authentication, timeout, rate-limit, malformed-response, and
+other provider failures into stable credential-safe errors.
+
 ## Ingestion and retrieval boundaries
 
 `EvidenceIngestionAdapter` safely parses local JSON (a record array or an

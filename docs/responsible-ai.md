@@ -231,6 +231,13 @@ The feature has no provider-specific setup and does not make recommendations,
 rankings, causal conclusions, consent inferences, authorizations, governance
 decisions, or success predictions.
 
+The optional OpenAI adapter does not alter these boundaries. It is activated
+only by application configuration with an environment-based API key; its SDK
+is not required for deterministic use. Requests contain only the explicit
+interpretation payload, and provider output still needs deterministic span,
+entity, context, and evidence-ID validation. A successful API response is not
+truth, human review, effectiveness evidence, or permission to act.
+
 The current engine represents evidence, patterns, insights, hypotheses,
 experiments, and learning as different data types. An observed result
 from an inspiration or pilot is never automatically converted into a

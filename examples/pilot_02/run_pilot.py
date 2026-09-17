@@ -1,6 +1,7 @@
 """Fictional federation strategy-discovery pilot: Part 1 only."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -61,6 +62,13 @@ def _fixture_interpretation(evidence_ids, evidence):
     ))
 
 
+def _optional_interpretation_provider(evidence_ids, evidence):
+    if os.environ.get("OPENAI_INTERPRETATION_ENABLED") != "1":
+        return _fixture_interpretation(evidence_ids, evidence), evidence_ids, evidence
+    from src.providers.openai_interpretation import OpenAIInterpretationProvider
+    return OpenAIInterpretationProvider(), evidence_ids[:2], evidence[:2]
+
+
 def run_pilot(output_directory):
     """Run fictional strategy discovery only; no governance or intervention is created."""
     output = Path(output_directory)
@@ -77,12 +85,12 @@ def run_pilot(output_directory):
             [item.evidence for item in imported], workflow_result.evidence_ids,
             [item.provenance for item in imported],
         )
+        assisted_provider, assisted_ids, assisted_evidence = _optional_interpretation_provider(
+            workflow_result.evidence_ids, [item.evidence for item in imported]
+        )
         assisted_narrative_analysis = NarrativeReasoningEngine(
-            narrative_config, interpretation_provider=_fixture_interpretation(
-                workflow_result.evidence_ids, [item.evidence for item in imported]
-            )
-        ).analyse([item.evidence for item in imported], workflow_result.evidence_ids,
-                  [item.provenance for item in imported])
+            narrative_config, interpretation_provider=assisted_provider
+        ).analyse(assisted_evidence, assisted_ids, [item.provenance for item in imported][:len(assisted_evidence)])
         programmes = [store.save_historical_programme(item) for item in historical_input]
         historical = HistoricalDiscoveryEngine().discover(PROBLEM, programmes, target_sector="community organisations")
         inspirations = [InnovationInspiration("historical", p.title, p.geography or "unknown", p.mechanism,
