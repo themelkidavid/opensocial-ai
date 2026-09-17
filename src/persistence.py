@@ -1199,7 +1199,10 @@ class SQLitePersistenceStore(PersistenceStore):
         self,
         database_path: Union[str, Path] = ":memory:",
     ) -> None:
-        self._connection = sqlite3.connect(str(database_path))
+        # FastAPI executes synchronous endpoints in worker threads; SQLite's
+        # connection may therefore cross the application/request boundary.
+        # Callers remain responsible for coordinating concurrent writes.
+        self._connection = sqlite3.connect(str(database_path), check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA foreign_keys = ON")
         self._create_schema()
