@@ -231,6 +231,7 @@ class EvidencePackRenderer(_Renderer):
             ("Patterns", pack.patterns), ("Insights", pack.insights),
             ("Programme references", pack.programme_references), ("Mechanism references", pack.mechanism_references),
             ("Outcome metrics", pack.outcome_metrics), ("Observations", pack.observations),
+            ("Source hypothesis IDs", pack.source_hypothesis_ids),
             ("Known limitations", pack.known_limitations),
         ])
         return pack, metadata, sections
@@ -256,7 +257,8 @@ class EvidencePackRenderer(_Renderer):
         pack = pack.finalized()
         record = self.write(self.render_markdown(pack), path, overwrite)
         record = ExportRecord(record.entity_type, pack.pack_id, record.format, record.checksum,
-                              record.rendered_at, record.path)
+                              record.rendered_at, record.path, pack.subject_type, pack.subject_id,
+                              pack.pack_id)
         self._audit(audit_events, "evidence_pack_exported", pack.pack_id, pack.subject_type, pack.subject_id,
                     "Evidence pack exported", {"format": "markdown"})
         return record
@@ -266,7 +268,8 @@ class EvidencePackRenderer(_Renderer):
         pack = pack.finalized()
         record = self.write(self.render_html(pack), path, overwrite)
         record = ExportRecord(record.entity_type, pack.pack_id, record.format, record.checksum,
-                              record.rendered_at, record.path)
+                              record.rendered_at, record.path, pack.subject_type, pack.subject_id,
+                              pack.pack_id)
         self._audit(audit_events, "evidence_pack_exported", pack.pack_id, pack.subject_type, pack.subject_id,
                     "Evidence pack exported", {"format": "html"})
         return record
@@ -299,6 +302,7 @@ class DecisionBriefRenderer(_Renderer):
             ("Unresolved questions", brief.unresolved_questions), ("Current human decision", brief.active_decision),
             ("Authorization state", brief.authorization_state), ("Expected learning", brief.expected_learning),
             ("Key uncertainties", brief.key_uncertainties),
+            ("Source hypothesis IDs", brief.source_hypothesis_ids),
         ])
         return brief, metadata, sections
 
@@ -323,7 +327,8 @@ class DecisionBriefRenderer(_Renderer):
         brief = brief.finalized()
         record = self.write(self.render_markdown(brief), path, overwrite)
         record = ExportRecord(record.entity_type, brief.brief_id, record.format, record.checksum,
-                              record.rendered_at, record.path)
+                              record.rendered_at, record.path, brief.subject_type, brief.subject_id,
+                              brief.brief_id, brief.brief_version)
         self._audit(audit_events, "decision_brief_exported", brief.brief_id, brief.subject_type, brief.subject_id,
                     "Decision brief exported", {"format": "markdown", "version": brief.brief_version})
         return record
@@ -333,7 +338,8 @@ class DecisionBriefRenderer(_Renderer):
         brief = brief.finalized()
         record = self.write(self.render_html(brief), path, overwrite)
         record = ExportRecord(record.entity_type, brief.brief_id, record.format, record.checksum,
-                              record.rendered_at, record.path)
+                              record.rendered_at, record.path, brief.subject_type, brief.subject_id,
+                              brief.brief_id, brief.brief_version)
         self._audit(audit_events, "decision_brief_exported", brief.brief_id, brief.subject_type, brief.subject_id,
                     "Decision brief exported", {"format": "html", "version": brief.brief_version})
         return record

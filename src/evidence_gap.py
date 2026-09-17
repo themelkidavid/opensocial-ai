@@ -27,6 +27,7 @@ class EvidenceGap:
     description: str
     investigation_question: str
     priority: str = "medium"
+    coverage: Dict[str, int] = None
 
     def to_dict(self) -> Dict:
         """Return the evidence gap as a dictionary."""
@@ -155,22 +156,18 @@ class EvidenceGapAnalysis:
             if item.date and item.date.strip()
         ]
 
-        if dated_items:
-            return []
+        return EvidenceGapAnalysis._coverage_gap("time", len(dated_items), len(evidence),
+            "The evidence does not contain dates, so changes over time cannot be assessed.",
+            "Date metadata is incomplete, so changes over time may not be assessed consistently.",
+            "How has the problem or outcome changed over time?", "medium")
 
-        return [
-            EvidenceGap(
-                gap_type="time",
-                description=(
-                    "The evidence does not contain dates, so changes "
-                    "over time cannot be assessed."
-                ),
-                investigation_question=(
-                    "How has the problem or outcome changed over time?"
-                ),
-                priority="medium",
-            )
-        ]
+    @staticmethod
+    def _coverage_gap(gap_type, available, total, missing_description, partial_description, question, priority):
+        coverage = {"records_with_metadata": available, "total_records": total}
+        if available == total:
+            return []
+        return [EvidenceGap(gap_type, missing_description if not available else partial_description,
+                            question, priority, coverage)]
 
     @staticmethod
     def _check_locations(
@@ -184,23 +181,7 @@ class EvidenceGapAnalysis:
             if item.location and item.location.strip()
         }
 
-        if locations:
-            return []
-
-        return [
-            EvidenceGap(
-                gap_type="location",
-                description=(
-                    "The evidence does not contain location information, "
-                    "so geographic differences cannot be assessed."
-                ),
-                investigation_question=(
-                    "Does the problem occur differently across "
-                    "locations or service areas?"
-                ),
-                priority="medium",
-            )
-        ]
+        return EvidenceGapAnalysis._coverage_gap("location", sum(bool(item.location and item.location.strip()) for item in evidence), len(evidence), "The evidence does not contain location information, so geographic differences cannot be assessed.", "Location metadata is incomplete, so geographic differences may not be assessed consistently.", "Does the problem occur differently across locations or service areas?", "medium")
 
     @staticmethod
     def _check_populations(
@@ -214,23 +195,7 @@ class EvidenceGapAnalysis:
             if item.population and item.population.strip()
         }
 
-        if populations:
-            return []
-
-        return [
-            EvidenceGap(
-                gap_type="population",
-                description=(
-                    "The evidence does not identify the populations "
-                    "represented, limiting comparison between groups."
-                ),
-                investigation_question=(
-                    "Which groups are most affected and which groups "
-                    "are less affected by the problem?"
-                ),
-                priority="high",
-            )
-        ]
+        return EvidenceGapAnalysis._coverage_gap("population", sum(bool(item.population and item.population.strip()) for item in evidence), len(evidence), "The evidence does not identify the populations represented, limiting comparison between groups.", "Population metadata is incomplete, limiting comparison between groups.", "Which groups are most affected and which groups are less affected by the problem?", "high")
 
     @staticmethod
     def _check_comparison(
@@ -289,35 +254,15 @@ class EvidenceGapAnalysis:
             "drop-off",
         }
 
-        has_outcome_signal = False
-
+        records_with_outcomes = 0
         for item in evidence:
             words = {
                 word.strip(".,:;!?()[]{}")
                 for word in item.content.lower().split()
             }
 
-            if words.intersection(outcome_terms):
-                has_outcome_signal = True
-                break
-
-        if has_outcome_signal:
-            return []
-
-        return [
-            EvidenceGap(
-                gap_type="outcome",
-                description=(
-                    "The available evidence does not contain a clear "
-                    "outcome-related signal."
-                ),
-                investigation_question=(
-                    "What measurable change or outcome is associated "
-                    "with the problem or intervention?"
-                ),
-                priority="high",
-            )
-        ]
+            if words.intersection(outcome_terms): records_with_outcomes += 1
+        return EvidenceGapAnalysis._coverage_gap("outcome", records_with_outcomes, len(evidence), "The available evidence does not contain a clear outcome-related signal.", "Outcome-related signals are incomplete across the available evidence.", "What measurable change or outcome is associated with the problem or intervention?", "high")
 
 
 if __name__ == "__main__":

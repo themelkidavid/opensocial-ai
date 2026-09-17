@@ -5,6 +5,18 @@ from src.evidence_gap import EvidenceGap, EvidenceGapAnalysis
 
 
 class TestEvidenceGapAnalysis(unittest.TestCase):
+    def test_partial_metadata_coverage_is_visible(self):
+        evidence = [
+            create_evidence("report", "Engagement improved.", population="young adults")
+            for _ in range(2)
+        ] + [create_evidence("report", "Engagement improved.") for _ in range(8)]
+        gaps = EvidenceGapAnalysis().discover(evidence)
+        population = next(gap for gap in gaps if gap.gap_type == "population")
+        self.assertEqual(population.coverage, {"records_with_metadata": 2, "total_records": 10})
+
+    def test_full_population_coverage_has_no_population_gap(self):
+        evidence = [create_evidence("report", "Engagement improved.", population="young adults") for _ in range(10)]
+        self.assertFalse(any(gap.gap_type == "population" for gap in EvidenceGapAnalysis().discover(evidence)))
 
     def setUp(self):
         self.analysis = EvidenceGapAnalysis()

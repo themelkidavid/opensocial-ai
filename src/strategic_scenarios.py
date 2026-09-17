@@ -9,7 +9,7 @@ _REVIEWS={"exploratory","reviewed","approved_for_experiment_design","rejected","
 @dataclass
 class StrategicScenario:
  title:str; scenario_type:str; problem:str; strategic_question:str
- strategy_opportunity_id:Optional[str]=None; portfolio_pattern_ids:List[str]=field(default_factory=list); programme_ids:List[str]=field(default_factory=list); mechanism_ids:List[str]=field(default_factory=list); inspiration_sources:List[str]=field(default_factory=list); evidence_basis:List[str]=field(default_factory=list); assumptions:List[str]=field(default_factory=list); uncertainties:List[str]=field(default_factory=list); evidence_gaps:List[str]=field(default_factory=list); expected_learning:List[str]=field(default_factory=list); potential_metric_ids:List[str]=field(default_factory=list); potential_experiment:Optional[str]=None; provenance:Optional[str]=None; review_status:str="exploratory"; created_at:Optional[str]=None; scenario_id:Optional[str]=None
+ strategy_opportunity_id:Optional[str]=None; portfolio_pattern_ids:List[str]=field(default_factory=list); programme_ids:List[str]=field(default_factory=list); mechanism_ids:List[str]=field(default_factory=list); inspiration_sources:List[str]=field(default_factory=list); evidence_basis:List[str]=field(default_factory=list); assumptions:List[str]=field(default_factory=list); uncertainties:List[str]=field(default_factory=list); evidence_gaps:List[str]=field(default_factory=list); expected_learning:List[str]=field(default_factory=list); potential_metric_ids:List[str]=field(default_factory=list); potential_experiment:Optional[str]=None; provenance:Optional[str]=None; review_status:str="exploratory"; created_at:Optional[str]=None; scenario_id:Optional[str]=None; source_hypothesis_ids:List[str]=field(default_factory=list)
  def to_dict(self): return asdict(self)
  def validated(self):
   if self.scenario_type not in _TYPES: raise ValueError("unsupported scenario_type")
@@ -17,7 +17,7 @@ class StrategicScenario:
   for x in (self.title,self.problem,self.strategic_question):
    if not isinstance(x,str) or not x.strip(): raise ValueError("scenario text cannot be empty")
   payload=self.to_dict(); sid=self.scenario_id or "scenario-"+hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()[:24]
-  return StrategicScenario(self.title.strip(),self.scenario_type,self.problem.strip(),self.strategic_question.strip(),self.strategy_opportunity_id,list(self.portfolio_pattern_ids),list(self.programme_ids),list(self.mechanism_ids),list(self.inspiration_sources),list(self.evidence_basis),list(self.assumptions),list(self.uncertainties),list(self.evidence_gaps),list(self.expected_learning),list(self.potential_metric_ids),self.potential_experiment,self.provenance,self.review_status,self.created_at,sid)
+  return StrategicScenario(self.title.strip(),self.scenario_type,self.problem.strip(),self.strategic_question.strip(),self.strategy_opportunity_id,list(self.portfolio_pattern_ids),list(self.programme_ids),list(self.mechanism_ids),list(self.inspiration_sources),list(self.evidence_basis),list(self.assumptions),list(self.uncertainties),list(self.evidence_gaps),list(self.expected_learning),list(self.potential_metric_ids),self.potential_experiment,self.provenance,self.review_status,self.created_at,sid,list(self.source_hypothesis_ids))
 
 @dataclass
 class ScenarioComparison:
