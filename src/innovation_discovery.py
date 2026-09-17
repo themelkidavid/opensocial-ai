@@ -234,7 +234,9 @@ class InnovationReport:
     def to_dict(self) -> Dict:
         """Return the complete report as a dictionary."""
 
-        return asdict(self)
+        result = asdict(self)
+        result["innovation_hypotheses"] = [item.to_dict() for item in self.innovation_hypotheses]
+        return result
 
 
 class InnovationDiscoveryEngine:
