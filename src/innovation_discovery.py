@@ -89,6 +89,11 @@ try:
 
     from src.retrieval import RelevanceRetriever
 
+    from src.narrative_reasoning import (
+        NarrativeAnalysis,
+        NarrativeReasoningEngine,
+    )
+
 except ModuleNotFoundError:
 
     from evidence import EvidenceItem
@@ -149,6 +154,11 @@ except ModuleNotFoundError:
     )
 
     from retrieval import RelevanceRetriever
+
+    from narrative_reasoning import (
+        NarrativeAnalysis,
+        NarrativeReasoningEngine,
+    )
 
 
 @dataclass
@@ -219,6 +229,8 @@ class InnovationReport:
         default_factory=list
     )
 
+    narrative_analysis: Optional[NarrativeAnalysis] = None
+
     def to_dict(self) -> Dict:
         """Return the complete report as a dictionary."""
 
@@ -275,6 +287,7 @@ class InnovationDiscoveryEngine:
         self,
         storage: Optional[PersistenceStore] = None,
         retriever: Optional[RelevanceRetriever] = None,
+        narrative_reasoning_engine: Optional[NarrativeReasoningEngine] = None,
     ) -> None:
         """Initialise analytical components and optional persistence."""
 
@@ -292,6 +305,10 @@ class InnovationDiscoveryEngine:
 
         self.evidence_conflict_detector = (
             EvidenceConflictDetector()
+        )
+
+        self.narrative_reasoning_engine = (
+            narrative_reasoning_engine or NarrativeReasoningEngine()
         )
 
         self.insight_generator = (
@@ -446,6 +463,15 @@ class InnovationDiscoveryEngine:
             self.evidence_conflict_detector.discover(
                 evidence
             )
+        )
+
+        narrative_analysis = self.narrative_reasoning_engine.analyse(
+            evidence,
+            evidence_ids=(
+                [item.evidence_id for item in stored_evidence]
+                if stored_evidence else None
+            ),
+            evidence_provenance=evidence_provenance,
         )
 
         evidence_gap_details = (
@@ -714,6 +740,7 @@ class InnovationDiscoveryEngine:
             innovation_hypotheses=innovation_hypotheses,
             experiment_designs=experiment_designs,
             validated_learning=validated_learning,
+            narrative_analysis=narrative_analysis,
         )
 
     @staticmethod

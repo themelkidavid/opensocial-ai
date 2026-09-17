@@ -113,3 +113,5 @@ human investigation rather than a claim of universal effectiveness.
 Strategic scenarios help people compare investigative paths, assumptions, and expected learning without converting those paths into recommendations, predictions, or automatic experiments.
 
 Evidence packs, versioned decision briefs, and deterministic local exports in Markdown, HTML, DOCX, or PDF make the same uncertainty and disagreement visible to human reviewers. Traceability metadata and byte-level checksums support review without turning an export into a signature, decision, recommendation, authorization, or claim of success.
+
+Deterministic narrative extraction can make source-stated claims, possible disagreement, and mechanism descriptions easier to inspect. It retains context and provenance while remaining an aid to human interpretation, not a truth assessment, causal finding, recommendation, or prediction.

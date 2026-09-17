@@ -19,6 +19,12 @@ class TestEndToEndPilot02(unittest.TestCase):
             self.assertTrue(all(item.startswith("evidence-") for item in result["evidence_ids"]))
             self.assertTrue(result["patterns"])
             self.assertTrue(result["evidence_gaps"])
+            narrative = result["narrative_reasoning"]
+            self.assertTrue(narrative["claims"])
+            self.assertTrue(narrative["mechanism_candidates"])
+            self.assertTrue(set(item["evidence_id"] for item in narrative["claims"]).issubset(set(result["evidence_ids"])))
+            self.assertTrue(all(item["provenance"] for item in narrative["mechanism_candidates"]))
+            self.assertEqual(result["narrative_comparison"]["mechanism_candidate_count"], len(narrative["mechanism_candidates"]))
             self.assertTrue(result["historical_candidates"])
             self.assertTrue(result["cross_sector_candidates"])
             for candidate in result["cross_sector_candidates"]:

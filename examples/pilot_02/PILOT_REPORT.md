@@ -6,6 +6,8 @@ All organisations, people, records, observations, programmes, and results in thi
 
 The fictional federation evidence describes donor concentration, uneven organisational capacity, fragmented programme knowledge, and weak transfer of local innovations. Pattern analysis makes recurrence and metadata coverage visible, but it does not establish causal relationships. Partial coverage gaps and inconsistent outcome measurement remain visible. Narrative disagreement in the source records was not converted into a formal conflict by the current rule-based detector.
 
+The pilot also runs a local, deterministic narrative pass. It records source-stated claims, possible context-dependent disagreement, and source-described mechanism candidates with evidence identifiers and provenance. These are extraction aids only: a narrative claim is not a verified fact, a candidate is not a proven mechanism, and a context difference is not a causal explanation.
+
 ## Historical and cross-sector learning
 
 Historical retrieval adds candidate mechanisms including peer learning, shared services, pooled fundraising, leadership mentoring, knowledge repositories, and innovation exchanges. Cross-sector candidates from cooperative systems, open-source communities, startup accelerators, and professional associations are prompts for contextual investigation only: sector similarity does not demonstrate transferability.

@@ -81,6 +81,7 @@ following pipeline:
 | Evidence gaps | `evidence_gap.py` | `EvidenceGap` |
 | Evidence quality | `evidence_quality.py` | `EvidenceQuality` |
 | Evidence conflicts | `evidence_conflict.py` | `EvidenceConflict` |
+| Narrative reasoning | `narrative_reasoning.py` | Source-stated `NarrativeClaim`, possible context-aware disagreement, and mechanism candidates |
 | Insights | `insight_generation.py` | `InsightCandidate` |
 | Innovation opportunities | `innovation_opportunity.py` | `InnovationOpportunity` |
 | Inspiration | `innovation_inspiration.py` | `InnovationInspiration` |

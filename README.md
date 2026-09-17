@@ -176,6 +176,8 @@ AI-generated ideas will not automatically be treated as solutions.
 
 They will become **hypotheses for human experts and communities to evaluate, adapt and test.**
 
+Narrative reasoning can additionally extract transparent, deterministic source-stated claims and possible context-aware disagreements. It preserves source identifiers and provenance, but does not verify claims, infer causality, or turn a described mechanism into a proven solution.
+
 ---
 
 # A New Model for Social Innovation

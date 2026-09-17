@@ -18,6 +18,7 @@ from src.historical_memory import HistoricalDiscoveryEngine, HistoricalProgramme
 from src.innovation_combination import InnovationCombinationEngine
 from src.innovation_inspiration import InnovationInspiration
 from src.innovation_reasoning import InnovationReasoningEngine
+from src.narrative_reasoning import NarrativeReasoningConfig, NarrativeReasoningEngine
 from src.persistence import SQLitePersistenceStore, _stable_id
 from src.portfolio_learning import PortfolioLearningEngine, ProgrammePortfolio, StrategyDiscoveryEngine
 from src.strategic_scenarios import StrategicScenario, StrategicScenarioEngine
@@ -53,6 +54,11 @@ def run_pilot(output_directory):
         workflow = OpenSocialWorkflow(store)
         workflow_result = workflow.run(PROBLEM, [item.evidence for item in imported], [item.provenance for item in imported])
         report = workflow_result.report
+        narrative_config = NarrativeReasoningConfig(**json.loads((here / "reasoning_config.json").read_text()))
+        narrative_analysis = NarrativeReasoningEngine(narrative_config).analyse(
+            [item.evidence for item in imported], workflow_result.evidence_ids,
+            [item.provenance for item in imported],
+        )
         programmes = [store.save_historical_programme(item) for item in historical_input]
         historical = HistoricalDiscoveryEngine().discover(PROBLEM, programmes, target_sector="community organisations")
         inspirations = [InnovationInspiration("historical", p.title, p.geography or "unknown", p.mechanism,
@@ -166,6 +172,14 @@ def run_pilot(output_directory):
             "evidence_quality": [item.to_dict() for item in report.evidence_quality],
             "evidence_gaps": [item.to_dict() for item in report.evidence_gap_details],
             "conflicts": [item.to_dict() for item in report.evidence_conflicts],
+            "narrative_reasoning": narrative_analysis.to_dict(),
+            "narrative_comparison": {
+                "formal_conflict_count": len(report.evidence_conflicts),
+                "narrative_conflict_count": len(narrative_analysis.narrative_conflicts),
+                "context_dependency_count": len(narrative_analysis.context_dependencies),
+                "mechanism_candidate_count": len(narrative_analysis.mechanism_candidates),
+                "note": "Narrative signals supplement rather than replace formal conflict detection and require human contextual investigation.",
+            },
             "patterns": [item.to_dict() for item in report.observed_patterns],
             "opportunity_ids": [_hypothesis_id(item) for item in report.innovation_hypotheses],
             "historical_candidates": [item.to_dict() for item in historical],
