@@ -212,6 +212,10 @@ or intervention recommendations.
 
 Scenarios preserve evidence attribution, assumptions, uncertainty, and expected learning rather than predicting results. Review states—`exploratory`, `reviewed`, `approved_for_experiment_design`, `rejected`, and `archived`—are governance metadata only. A reviewed or approved scenario is not proven effective; a historical precedent is not an expected future outcome; cross-sector similarity is not transferability; and human approval is not evidence of success.
 
+## Evidence packs, briefs, and exports
+
+Evidence packs and decision briefs preserve supplied evidence references, uncertainty, gaps, conflicts, alternatives, dissent, and limitations. Their deterministic Markdown and HTML renderings retain source identifiers and do not fill missing fields with claims. A Decision Brief is not a decision; an Evidence Pack is not a recommendation; a summary is not ground truth. Approval is not effectiveness, historical precedent is not a predicted outcome, evidence quantity is not evidence quality, and human disagreement is not error.
+
 The current engine represents evidence, patterns, insights, hypotheses,
 experiments, and learning as different data types. An observed result
 from an inspiration or pilot is never automatically converted into a

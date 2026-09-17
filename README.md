@@ -314,6 +314,10 @@ Its strategy opportunities are questions for human investigation, not recommenda
 
 `StrategicScenarioEngine` creates deterministic, evidence-attributed exploratory scenarios from portfolio patterns. It preserves assumptions, uncertainties, expected learning, provenance, and an optional experiment concept. Scenarios are not recommendations or predictions; SQLite persistence and audit events record their review lifecycle.
 
+### Evidence packs, decision briefs, and rendering
+
+`EvidencePack` preserves a structured evidence snapshot: its quality summary, gaps, conflicts, references, outcome metadata, provenance, and limitations. `DecisionBriefBuilder` assembles existing evidence and governance records into immutable, per-subject versioned `DecisionBrief` snapshots, including alternatives, dissent, unresolved questions, human decision status, and authorization state. The local renderers produce deterministic Markdown or HTML with traceability identifiers and visible uncertainty; exports are not decisions, recommendations, predictions, or proof of effectiveness.
+
 ### Optional persistence, ingestion, and auditability
 
 The in-memory workflow remains the default. Applications that need local,

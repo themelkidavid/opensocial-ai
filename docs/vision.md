@@ -111,3 +111,5 @@ while preserving their differences and treating recurrence as a question for
 human investigation rather than a claim of universal effectiveness.
 
 Strategic scenarios help people compare investigative paths, assumptions, and expected learning without converting those paths into recommendations, predictions, or automatic experiments.
+
+Evidence packs, versioned decision briefs, and deterministic local exports make the same uncertainty and disagreement visible to human reviewers. They improve traceability without automating a decision, recommendation, authorization, or claim of success.
