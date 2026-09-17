@@ -397,6 +397,21 @@ the engine with real programme information.
 
 ## Development
 
+### Optional local REST API
+
+The provider-neutral core can be exposed through the optional FastAPI layer.
+Install it separately with `python3 -m pip install -r requirements-web.txt`,
+then run `python3 -m uvicorn src.api.app:app --reload` and open
+`http://127.0.0.1:8000/docs`. API v1 provides health, current-process project,
+evidence, exploratory analysis, and read/render decision-brief endpoints under
+`/api/v1`. It defaults to local deterministic analysis; assisted mode requires
+an explicitly injected provider. Authentication, deployment, durable projects,
+and durable analysis snapshots are not part of this phase.
+
+A fictional local demo flow is: create a project, add evidence, run analysis,
+retrieve the analysis ID, and create/read its exploratory brief. These routes
+never create a human decision or experiment authorization automatically.
+
 OpenSocial AI currently has no external runtime dependencies. Python
 3.12 is used in CI; the optional SQLite store uses Python's built-in
 `sqlite3` module.

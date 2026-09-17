@@ -1,0 +1,4 @@
+# Optional outer web API layer. Core modules do not import these packages.
+fastapi>=0.110,<1
+uvicorn>=0.27,<1
+python-multipart>=0.0.9,<1

@@ -178,6 +178,17 @@ only `InterpretationRequest` content, retains safe provider/model metadata,
 and converts authentication, timeout, rate-limit, malformed-response, and
 other provider failures into stable credential-safe errors.
 
+## Optional web API boundary
+
+`src.api` is a FastAPI outer layer and is never imported by domain modules.
+`create_app()` accepts an injected persistence store and optional interpretation
+provider. API v1 has scoped evidence, exploratory analysis, narrative analysis,
+and immutable brief rendering endpoints; its error responses use a stable
+`{error: {code, message}}` shape. Evidence is stored through the existing
+SQLite store. Projects and analysis snapshots are deliberately process-local in
+Phase 1, so they are not a multi-tenant or deployment-ready workspace model.
+The API does not create governance decisions or authorizations from analysis.
+
 ## Ingestion and retrieval boundaries
 
 `EvidenceIngestionAdapter` safely parses local JSON (a record array or an
