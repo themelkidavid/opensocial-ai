@@ -18,6 +18,7 @@ from src.historical_memory import HistoricalDiscoveryEngine, HistoricalProgramme
 from src.innovation_combination import InnovationCombinationEngine
 from src.innovation_inspiration import InnovationInspiration
 from src.innovation_reasoning import InnovationReasoningEngine
+from src.llm_interpretation import InterpretationResponse, StaticInterpretationProvider, compare_interpretations
 from src.narrative_reasoning import NarrativeReasoningConfig, NarrativeReasoningEngine
 from src.persistence import SQLitePersistenceStore, _stable_id
 from src.portfolio_learning import PortfolioLearningEngine, ProgrammePortfolio, StrategyDiscoveryEngine
@@ -43,6 +44,23 @@ def _novelty(kind):
     return {"classification": "useful_recombination", "reason": "It connects existing documented mechanisms without claiming effectiveness."}
 
 
+def _fixture_interpretation(evidence_ids, evidence):
+    """Grounded local test fixture; deliberately not a live language model."""
+    learning = evidence[11].content
+    digital = evidence[9].content
+    return StaticInterpretationProvider(InterpretationResponse(
+        provider_name="pilot_fixture",
+        claims=[
+            {"evidence_id": evidence_ids[11], "statement": learning, "subject": "peer exchange",
+             "relation": "reported_barrier", "object_or_outcome": "shared learning calendar", "direction": "absent",
+             "polarity": "negative", "qualifiers": ["useful"], "context": {}, "supporting_text_span": learning},
+            {"evidence_id": evidence_ids[9], "statement": "Some members lacked reliable digital access.", "subject": "Digital capability",
+             "relation": "reported_condition", "object_or_outcome": "reliable access", "direction": "absent",
+             "polarity": "negative", "qualifiers": ["varied substantially"], "context": {}, "supporting_text_span": digital},
+        ], uncertainties=["Fixture interpretations remain machine-extracted and require human review."],
+    ))
+
+
 def run_pilot(output_directory):
     """Run fictional strategy discovery only; no governance or intervention is created."""
     output = Path(output_directory)
@@ -59,6 +77,12 @@ def run_pilot(output_directory):
             [item.evidence for item in imported], workflow_result.evidence_ids,
             [item.provenance for item in imported],
         )
+        assisted_narrative_analysis = NarrativeReasoningEngine(
+            narrative_config, interpretation_provider=_fixture_interpretation(
+                workflow_result.evidence_ids, [item.evidence for item in imported]
+            )
+        ).analyse([item.evidence for item in imported], workflow_result.evidence_ids,
+                  [item.provenance for item in imported])
         programmes = [store.save_historical_programme(item) for item in historical_input]
         historical = HistoricalDiscoveryEngine().discover(PROBLEM, programmes, target_sector="community organisations")
         inspirations = [InnovationInspiration("historical", p.title, p.geography or "unknown", p.mechanism,
@@ -173,6 +197,10 @@ def run_pilot(output_directory):
             "evidence_gaps": [item.to_dict() for item in report.evidence_gap_details],
             "conflicts": [item.to_dict() for item in report.evidence_conflicts],
             "narrative_reasoning": narrative_analysis.to_dict(),
+            "assisted_interpretation": assisted_narrative_analysis.to_dict(),
+            "interpretation_comparison": compare_interpretations(
+                narrative_analysis, assisted_narrative_analysis.assisted_interpretation
+            ),
             "narrative_comparison": {
                 "formal_conflict_count": len(report.evidence_conflicts),
                 "narrative_conflict_count": len(narrative_analysis.narrative_conflicts),

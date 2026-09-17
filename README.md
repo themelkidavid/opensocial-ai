@@ -368,6 +368,17 @@ only the experiment analysis corpus has an ID-level evidence link.
 
 ## Responsible use
 
+### Optional assisted evidence interpretation
+
+`NarrativeReasoningEngine` can optionally call a caller-supplied,
+provider-neutral interpretation interface. Its structured output is
+validated against explicitly supplied evidence text and is exposed separately
+as machine-extracted claims, mechanism candidates, and possible conflicts.
+The default remains deterministic rule-based extraction. Assisted
+interpretation is not truth, a recommendation, a strategy choice, an
+authorization, or evidence of effectiveness; explicit human review remains
+separate.
+
 Use the engine to structure inquiry, not to automate social-sector
 decisions. Review every output with affected communities and appropriate
 programme, safeguarding, and subject-matter practitioners. Supply only

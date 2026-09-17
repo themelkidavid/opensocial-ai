@@ -26,6 +26,17 @@ Useful real-meeting materials would be the traceable evidence gaps, explicit res
 
 Important reasoning improvements: narrative conflict extraction, semantic/contextual retrieval, structured mechanism extraction, and scenario diversification. Usability improvements: reduce manual translation between historical, portfolio, scenario, and brief records. A future language model could assist semantic retrieval, summarization, and extraction under review. It must not approve governance actions, authorize experiments, infer consent, determine effectiveness, or make causal conclusions.
 
+## Phase 2 assisted-interpretation experiment
+
+Pilot #2 also compares the deterministic narrative pass with a local fixture
+provider that supplies grounded structured interpretations of the same
+fictional evidence. The fixture adds source-attributed barriers about the
+absence of a shared learning calendar and uneven reliable access. These are
+machine-extracted interpretations, not new evidence or facts. They are kept
+outside portfolio, scenario, governance, and authorization processing. The
+experiment demonstrates validation and attribution plumbing only; it does not
+yet establish that a real external language model would improve strategy work.
+
 ## Responsible-AI finding
 
 The pilot retains uncertainty, evidence gaps, limitations, dissent, explicit human review, decision, and authorization. It does not rank organisations or strategies, recommend adoption, infer consent, claim causal effectiveness, or predict organisational success.

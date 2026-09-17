@@ -157,6 +157,18 @@ recording, reviewer attribution, and learning generation. The audit trail
 does not authorize a real-world action, prove an intervention, or verify a
 reviewer's identity or that review occurred.
 
+## Optional assisted interpretation boundary
+
+`llm_interpretation` defines a provider-neutral `interpret(request)` boundary
+with no built-in network client or vendor dependency. A request contains only
+explicit evidence text and source context. The validator requires known
+evidence IDs, literal supporting spans, grounded entities/numbers/context,
+controlled relationship values, and valid cross-claim references. Rejected or
+unavailable provider output is kept out of the structured result while the
+deterministic narrative pass continues. Assisted records remain separate from
+deterministic claims and are never automatically promoted into inspirations,
+mechanisms, strategies, or governance objects.
+
 ## Ingestion and retrieval boundaries
 
 `EvidenceIngestionAdapter` safely parses local JSON (a record array or an

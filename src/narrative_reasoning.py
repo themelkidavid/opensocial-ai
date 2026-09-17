@@ -12,8 +12,22 @@ from typing import Dict, Iterable, List, Optional
 
 try:
     from src.evidence import EvidenceItem
+    from src.llm_interpretation import (
+        InterpretationEvidence,
+        InterpretationProvider,
+        InterpretationRequest,
+        InterpretationValidator,
+        StructuredInterpretation,
+    )
 except ModuleNotFoundError:  # pragma: no cover - supports direct module use
     from evidence import EvidenceItem
+    from llm_interpretation import (
+        InterpretationEvidence,
+        InterpretationProvider,
+        InterpretationRequest,
+        InterpretationValidator,
+        StructuredInterpretation,
+    )
 
 
 def _normalise(value: Optional[str]) -> str:
@@ -99,9 +113,11 @@ class NarrativeAnalysis:
     mechanism_candidates: List[MechanismCandidate] = field(default_factory=list)
     unresolved_claims: List[str] = field(default_factory=list)
     extraction_notes: List[str] = field(default_factory=list)
+    assisted_interpretation: Optional[StructuredInterpretation] = None
+    interpretation_errors: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
-        return {
+        result = {
             "claims": [item.to_dict() for item in self.claims],
             "narrative_conflicts": [item.to_dict() for item in self.narrative_conflicts],
             "context_dependencies": [item.to_dict() for item in self.context_dependencies],
@@ -109,6 +125,14 @@ class NarrativeAnalysis:
             "unresolved_claims": list(self.unresolved_claims),
             "extraction_notes": list(self.extraction_notes),
         }
+        if self.assisted_interpretation is not None:
+            result["assisted_interpretation"] = self.assisted_interpretation.to_dict()
+            result["assisted_claims"] = [item.to_dict() for item in self.assisted_interpretation.claims]
+            result["assisted_mechanism_candidates"] = [item.to_dict() for item in self.assisted_interpretation.mechanism_candidates]
+            result["assisted_conflict_candidates"] = [item.to_dict() for item in self.assisted_interpretation.conflict_candidates]
+        if self.interpretation_errors:
+            result["interpretation_errors"] = list(self.interpretation_errors)
+        return result
 
 
 class NarrativeReasoningEngine:
@@ -132,11 +156,15 @@ class NarrativeReasoningEngine:
     _ACTIONS = ("implemented", "introduced", "established", "created", "developed", "used", "shared", "supported", "provided", "enabled", "coordinated", "combined")
     _STOP_WORDS = {"the", "and", "with", "that", "this", "from", "were", "was", "after", "before", "into", "their", "they", "have", "has", "had", "for", "not", "did", "but", "reported", "organisations", "organization", "fictional"}
 
-    def __init__(self, config: Optional[NarrativeReasoningConfig] = None, retriever: object = None) -> None:
+    def __init__(self, config: Optional[NarrativeReasoningConfig] = None, retriever: object = None,
+                 interpretation_provider: Optional[InterpretationProvider] = None) -> None:
         if retriever is not None and not callable(getattr(retriever, "retrieve", None)):
             raise TypeError("retriever must provide a retrieve method")
+        if interpretation_provider is not None and not callable(getattr(interpretation_provider, "interpret", None)):
+            raise TypeError("interpretation_provider must provide an interpret method")
         self.config = config or NarrativeReasoningConfig()
         self.retriever = retriever
+        self.interpretation_provider = interpretation_provider
         self._aliases = self._build_aliases(self.config.concept_aliases)
 
     @staticmethod
@@ -151,12 +179,17 @@ class NarrativeReasoningEngine:
                 result.append((_normalise(value), canonical.strip()))
         return sorted(set(result), key=lambda item: (-len(item[0]), item[0]))
 
-    def analyse(self, evidence: Iterable[EvidenceItem], evidence_ids: Optional[List[str]] = None, evidence_provenance: Optional[List[object]] = None) -> NarrativeAnalysis:
+    def analyse(self, evidence: Iterable[EvidenceItem], evidence_ids: Optional[List[str]] = None,
+                evidence_provenance: Optional[List[object]] = None,
+                interpretation_metadata: Optional[List[Dict]] = None) -> NarrativeAnalysis:
         evidence = list(evidence)
         if evidence_ids is not None and len(evidence_ids) != len(evidence):
             raise ValueError("evidence_ids must align with evidence")
         if evidence_provenance is not None and len(evidence_provenance) != len(evidence):
             raise ValueError("evidence_provenance must align with evidence")
+        if interpretation_metadata is not None and (len(interpretation_metadata) != len(evidence)
+                                                    or not all(isinstance(item, dict) for item in interpretation_metadata)):
+            raise ValueError("interpretation_metadata must align with evidence as dictionaries")
         claims, mechanisms = [], []
         seen_mechanisms = set()
         for index, item in enumerate(evidence):
@@ -179,12 +212,35 @@ class NarrativeReasoningEngine:
         claims.sort(key=lambda item: item.claim_id)
         mechanisms.sort(key=lambda item: item.candidate_id)
         conflicts, dependencies = self._compare_claims(claims)
-        return NarrativeAnalysis(
+        analysis = NarrativeAnalysis(
             claims=claims, narrative_conflicts=conflicts, context_dependencies=dependencies,
             mechanism_candidates=mechanisms,
             unresolved_claims=[item.claim_id for item in claims if item.direction == "unknown"],
             extraction_notes=["Claims record source statements or implications, not verified facts.", "Rule-based extraction is deterministic and context-aware; it does not infer causality, effectiveness, or recommendations."] + (["An optional retriever was supplied but is not needed for local extraction."] if self.retriever else []),
         )
+        if self.interpretation_provider is not None:
+            supplied = {
+                (evidence_ids[index] if evidence_ids else item.metadata.get("evidence_id")) or _stable_id("evidence", {"index": index, "source_type": item.source_type, "content": item.content}): item
+                for index, item in enumerate(evidence)
+            }
+            if len(supplied) != len(evidence):
+                raise ValueError("assisted interpretation requires unique evidence identifiers")
+            request = InterpretationRequest([
+                InterpretationEvidence(evidence_id, item.content, item.source_type, item.date, item.location, item.population,
+                                      dict(interpretation_metadata[index]) if interpretation_metadata else {})
+                for index, (evidence_id, item) in enumerate(supplied.items())
+            ])
+            try:
+                response = self.interpretation_provider.interpret(request)
+                analysis.assisted_interpretation = InterpretationValidator().validate(response, supplied)
+                analysis.extraction_notes.append("Optional assisted interpretation was validated separately; it remains machine-extracted source attribution.")
+            except (TypeError, ValueError) as error:
+                analysis.interpretation_errors.append(str(error))
+                analysis.extraction_notes.append("Optional assisted interpretation was rejected by the validation boundary.")
+            except Exception as error:
+                analysis.interpretation_errors.append("provider error: %s" % error.__class__.__name__)
+                analysis.extraction_notes.append("Optional assisted interpretation was unavailable; deterministic extraction remains available.")
+        return analysis
 
     @staticmethod
     def _sentences(text: str) -> List[str]:

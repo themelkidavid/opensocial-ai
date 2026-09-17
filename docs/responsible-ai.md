@@ -220,6 +220,17 @@ Evidence packs and decision briefs preserve supplied evidence references, uncert
 
 The local narrative extractor records what a source states or implies, including its supplied context and provenance. Possible disagreement is surfaced only for related, opposing claims; materially different recorded contexts are shown as context dependencies rather than treated as a direct contradiction. Extraction is rule-based and configurable through caller-owned aliases. It neither establishes a claim as fact nor establishes a candidate mechanism as effective, transferable, causal, or recommended.
 
+### Optional assisted interpretation
+
+Any future interpretation provider receives only caller-selected evidence text
+and explicit context, never database contents, governance history, audit logs,
+credentials, filesystem paths, or unrelated records. Its output is untrusted
+until strict span and metadata grounding succeeds. A machine-extracted item is
+not human-reviewed unless an explicit caller action changes its review state.
+The feature has no provider-specific setup and does not make recommendations,
+rankings, causal conclusions, consent inferences, authorizations, governance
+decisions, or success predictions.
+
 The current engine represents evidence, patterns, insights, hypotheses,
 experiments, and learning as different data types. An observed result
 from an inspiration or pilot is never automatically converted into a
