@@ -92,7 +92,7 @@ following pipeline:
 | Outcome measurement | `outcome_metrics.py` | Caller-defined metrics, reviewed observations, and cautious comparisons |
 | Portfolio learning | `portfolio_learning.py` | Context-preserving patterns and exploratory strategy opportunities |
 | Strategic scenarios | `strategic_scenarios.py` | Exploratory scenarios, comparison, review lifecycle, and optional experiment concepts |
-| Evidence packs and decision briefs | `decision_briefs.py`, `brief_rendering.py` | Immutable evidence/brief snapshots and deterministic local Markdown or HTML rendering |
+| Evidence packs and decision briefs | `decision_briefs.py`, `brief_rendering.py` | Immutable evidence/brief snapshots and one normalized local Markdown, HTML, DOCX, or PDF rendering pipeline |
 | Validation and learning | `validation_learning.py` | `ValidationObservation`, `ValidatedLearning` |
 | Optional persistence and audit | `persistence.py` | Stored records and `AuditEvent` |
 

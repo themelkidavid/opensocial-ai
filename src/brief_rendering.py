@@ -31,6 +31,10 @@ class ExportRecord:
     checksum: str
     rendered_at: str
     path: Optional[str] = None
+    subject_type: Optional[str] = None
+    subject_id: Optional[str] = None
+    source_snapshot_id: Optional[str] = None
+    version: Optional[int] = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -107,6 +111,109 @@ class _Renderer:
             datetime.now(timezone.utc).isoformat(), str(destination),
         )
 
+    def normalized_document(self, entity: Any, include_responsible_ai_notice: bool = True) -> dict:
+        """Return the one ordered, source-faithful document representation for all formats."""
+        entity, metadata, sections = self._data(entity)
+        return {"title": entity.title, "entity_type": self.entity_type,
+                "entity_id": getattr(entity, "brief_id", None) or getattr(entity, "pack_id", None),
+                "subject_type": entity.subject_type, "subject_id": entity.subject_id,
+                "version": getattr(entity, "brief_version", None), "metadata": metadata,
+                "sections": sections,
+                "responsible_ai_notice": _NOTICE if include_responsible_ai_notice else None}
+
+    def _export_record(self, document: dict, path: Path) -> ExportRecord:
+        return ExportRecord(document["entity_type"], document["entity_id"], path.suffix.lstrip("."),
+                            sha256(path.read_bytes()).hexdigest(), datetime.now(timezone.utc).isoformat(), str(path),
+                            document["subject_type"], document["subject_id"], document["entity_id"],
+                            document["version"])
+
+
+class DocumentExporter:
+    """Shared safe output boundary; format subclasses receive normalized sections only."""
+
+    extension = ""
+
+    def _destination(self, path: Union[Path, str], overwrite: bool) -> Path:
+        destination = Path(path)
+        if not destination.parent.is_dir():
+            raise ValueError("Export directory does not exist")
+        if destination.exists() and not overwrite:
+            raise FileExistsError(f"Refusing to overwrite {destination}")
+        if destination.suffix.lower() != f".{self.extension}":
+            raise ValueError(f"Export path must end in .{self.extension}")
+        return destination
+
+
+class DocxExporter(DocumentExporter):
+    """Local DOCX formatter for normalized renderer output."""
+
+    extension = "docx"
+
+    def write(self, renderer: _Renderer, entity: Any, path: Union[Path, str], overwrite: bool = False,
+              include_responsible_ai_notice: bool = True, audit_events: Any = None) -> ExportRecord:
+        from docx import Document
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.shared import Inches, Pt
+        destination, data = self._destination(path, overwrite), renderer.normalized_document(entity, include_responsible_ai_notice)
+        document = Document(); section = document.sections[0]
+        section.top_margin = section.bottom_margin = Inches(0.7)
+        document.add_heading(data["title"], 0)
+        table = document.add_table(rows=0, cols=2); table.style = "Table Grid"
+        for label, value in data["metadata"]:
+            row = table.add_row().cells; row[0].text, row[1].text = label, _value(value)
+        if data["responsible_ai_notice"]:
+            document.add_heading("Responsible-AI notice", 1); document.add_paragraph(data["responsible_ai_notice"])
+        for heading, value in data["sections"]:
+            document.add_heading(heading, 1)
+            try: parsed = json.loads(value)
+            except (TypeError, ValueError): parsed = None
+            if isinstance(parsed, list):
+                for item in parsed: document.add_paragraph(_value(item), style="List Bullet")
+            else: document.add_paragraph(value)
+        footer = section.footer.paragraphs[0]; footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        footer.text = f"{data['entity_type']} ID: {data['entity_id']}" + (f" | Version: {data['version']}" if data["version"] is not None else "")
+        for paragraph in document.paragraphs:
+            for run in paragraph.runs: run.font.size = Pt(10)
+        document.core_properties.title = data["title"]
+        document.core_properties.subject = f"{data['subject_type']}: {data['subject_id']}"
+        document.core_properties.comments = "Traceable local export; checksum is not a digital signature."
+        document.save(destination)
+        record = renderer._export_record(data, destination)
+        renderer._audit(audit_events, f"{data['entity_type']}_docx_exported", data["entity_id"], data["subject_type"], data["subject_id"], "Document exported as DOCX.", {"format": "docx", "filename": destination.name, "checksum": record.checksum, "version": data["version"]})
+        return record
+
+
+class PdfExporter(DocumentExporter):
+    """Browser-free local PDF formatter for normalized renderer output."""
+
+    extension = "pdf"
+
+    def write(self, renderer: _Renderer, entity: Any, path: Union[Path, str], overwrite: bool = False,
+              include_responsible_ai_notice: bool = True, audit_events: Any = None) -> ExportRecord:
+        from reportlab.lib import colors
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Preformatted
+        destination, data = self._destination(path, overwrite), renderer.normalized_document(entity, include_responsible_ai_notice)
+        styles = getSampleStyleSheet(); styles.add(ParagraphStyle(name="DocumentTitle", parent=styles["Title"], alignment=TA_CENTER)); body = styles["BodyText"]
+        story = [Paragraph(escape(data["title"]), styles["DocumentTitle"]), Spacer(1, 12)]
+        rows = [[Paragraph(f"<b>{escape(label)}</b>", body), Paragraph(escape(_value(value)), body)] for label, value in data["metadata"]]
+        table = Table(rows, colWidths=[1.65 * inch, 5.35 * inch]); table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.25, colors.grey), ("VALIGN", (0, 0), (-1, -1), "TOP"), ("BACKGROUND", (0, 0), (0, -1), colors.whitesmoke), ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
+        story.extend([table, Spacer(1, 12)])
+        if data["responsible_ai_notice"]: story.extend([Paragraph("Responsible-AI notice", styles["Heading2"]), Paragraph(escape(data["responsible_ai_notice"]), body), Spacer(1, 8)])
+        for heading, value in data["sections"]: story.extend([Paragraph(escape(heading), styles["Heading2"]), Preformatted(value, styles["Code"]), Spacer(1, 8)])
+        def footer(canvas, doc):
+            canvas.saveState(); canvas.setFont("Helvetica", 8)
+            text = f"{data['entity_type']} ID: {data['entity_id']}" + (f" | Version: {data['version']}" if data["version"] is not None else "")
+            canvas.drawCentredString(letter[0] / 2, 0.45 * inch, text + f" | Page {doc.page}"); canvas.restoreState()
+        pdf = SimpleDocTemplate(str(destination), pagesize=letter, leftMargin=0.7 * inch, rightMargin=0.7 * inch, topMargin=0.7 * inch, bottomMargin=0.7 * inch, pageCompression=0)
+        pdf.title = data["title"]; pdf.build(story, onFirstPage=footer, onLaterPages=footer)
+        record = renderer._export_record(data, destination)
+        renderer._audit(audit_events, f"{data['entity_type']}_pdf_exported", data["entity_id"], data["subject_type"], data["subject_id"], "Document exported as PDF.", {"format": "pdf", "filename": destination.name, "checksum": record.checksum, "version": data["version"]})
+        return record
+
 
 class EvidencePackRenderer(_Renderer):
     entity_type = "evidence_pack"
@@ -163,6 +270,14 @@ class EvidencePackRenderer(_Renderer):
         self._audit(audit_events, "evidence_pack_exported", pack.pack_id, pack.subject_type, pack.subject_id,
                     "Evidence pack exported", {"format": "html"})
         return record
+
+    def write_docx(self, pack: EvidencePack, path: Union[Path, str], overwrite: bool = False,
+                   include_responsible_ai_notice: bool = True, audit_events: Any = None) -> ExportRecord:
+        return DocxExporter().write(self, pack, path, overwrite, include_responsible_ai_notice, audit_events)
+
+    def write_pdf(self, pack: EvidencePack, path: Union[Path, str], overwrite: bool = False,
+                  include_responsible_ai_notice: bool = True, audit_events: Any = None) -> ExportRecord:
+        return PdfExporter().write(self, pack, path, overwrite, include_responsible_ai_notice, audit_events)
 
 
 class DecisionBriefRenderer(_Renderer):
@@ -222,3 +337,11 @@ class DecisionBriefRenderer(_Renderer):
         self._audit(audit_events, "decision_brief_exported", brief.brief_id, brief.subject_type, brief.subject_id,
                     "Decision brief exported", {"format": "html", "version": brief.brief_version})
         return record
+
+    def write_docx(self, brief: DecisionBrief, path: Union[Path, str], overwrite: bool = False,
+                   include_responsible_ai_notice: bool = True, audit_events: Any = None) -> ExportRecord:
+        return DocxExporter().write(self, brief, path, overwrite, include_responsible_ai_notice, audit_events)
+
+    def write_pdf(self, brief: DecisionBrief, path: Union[Path, str], overwrite: bool = False,
+                  include_responsible_ai_notice: bool = True, audit_events: Any = None) -> ExportRecord:
+        return PdfExporter().write(self, brief, path, overwrite, include_responsible_ai_notice, audit_events)

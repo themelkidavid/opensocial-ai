@@ -316,7 +316,7 @@ Its strategy opportunities are questions for human investigation, not recommenda
 
 ### Evidence packs, decision briefs, and rendering
 
-`EvidencePack` preserves a structured evidence snapshot: its quality summary, gaps, conflicts, references, outcome metadata, provenance, and limitations. `DecisionBriefBuilder` assembles existing evidence and governance records into immutable, per-subject versioned `DecisionBrief` snapshots, including alternatives, dissent, unresolved questions, human decision status, and authorization state. The local renderers produce deterministic Markdown or HTML with traceability identifiers and visible uncertainty; exports are not decisions, recommendations, predictions, or proof of effectiveness.
+`EvidencePack` preserves a structured evidence snapshot: its quality summary, gaps, conflicts, references, outcome metadata, provenance, and limitations. `DecisionBriefBuilder` assembles existing evidence and governance records into immutable, per-subject versioned `DecisionBrief` snapshots, including alternatives, dissent, unresolved questions, human decision status, and authorization state. The shared local rendering pipeline produces deterministic Markdown, HTML, DOCX, or browser-free PDF exports with traceability identifiers and visible uncertainty. Export records retain byte-level SHA-256 checksums, format, and source snapshot identity; a checksum is not a digital signature. Exports require an explicit overwrite choice and are not decisions, recommendations, predictions, or proof of effectiveness.
 
 ### Optional persistence, ingestion, and auditability
 

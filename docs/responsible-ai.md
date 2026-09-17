@@ -214,7 +214,7 @@ Scenarios preserve evidence attribution, assumptions, uncertainty, and expected 
 
 ## Evidence packs, briefs, and exports
 
-Evidence packs and decision briefs preserve supplied evidence references, uncertainty, gaps, conflicts, alternatives, dissent, and limitations. Their deterministic Markdown and HTML renderings retain source identifiers and do not fill missing fields with claims. A Decision Brief is not a decision; an Evidence Pack is not a recommendation; a summary is not ground truth. Approval is not effectiveness, historical precedent is not a predicted outcome, evidence quantity is not evidence quality, and human disagreement is not error.
+Evidence packs and decision briefs preserve supplied evidence references, uncertainty, gaps, conflicts, alternatives, dissent, and limitations. Their deterministic Markdown, HTML, DOCX, and browser-free PDF renderings share one source-faithful structure, retain source identifiers, and do not fill missing fields with claims. Export records include a byte-level checksum for integrity checking, not a digital signature or proof of authorship. A Decision Brief is not a decision; an Evidence Pack is not a recommendation; a summary is not ground truth. Approval is not effectiveness, historical precedent is not a predicted outcome, evidence quantity is not evidence quality, and human disagreement is not error.
 
 The current engine represents evidence, patterns, insights, hypotheses,
 experiments, and learning as different data types. An observed result
