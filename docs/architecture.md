@@ -189,6 +189,22 @@ SQLite store. Projects and analysis snapshots are deliberately process-local in
 Phase 1, so they are not a multi-tenant or deployment-ready workspace model.
 The API does not create governance decisions or authorizations from analysis.
 
+## Optional browser interface boundary
+
+`web/` is an optional React, TypeScript, and Vite client for `/api/v1`. A
+single typed API service owns browser requests; React components do not
+reimplement evidence processing, reasoning, or persistence. Development Vite
+proxying keeps the local API boundary intact without adding permissive backend
+CORS. The frontend is independently testable with mocked API responses and is
+not required by Python tests.
+
+The MVP has dashboard, project workspace, evidence, analysis, discovery, and
+Decision Brief views. Its project route retains the selected project ID. It
+shows only data returned by the API and explicitly labels analysis as
+exploratory with required human review. It does not expose governance actions,
+provider configuration, recommendation, ranking, authorization, prediction,
+or effectiveness controls.
+
 ## Ingestion and retrieval boundaries
 
 `EvidenceIngestionAdapter` safely parses local JSON (a record array or an

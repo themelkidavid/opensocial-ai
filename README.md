@@ -412,6 +412,33 @@ A fictional local demo flow is: create a project, add evidence, run analysis,
 retrieve the analysis ID, and create/read its exploratory brief. These routes
 never create a human decision or experiment authorization automatically.
 
+### Local web interface (Phase 2 MVP)
+
+The optional React/TypeScript interface in `web/` is a browser client for the
+existing `/api/v1` boundary; it contains no duplicate reasoning logic. It uses
+the deterministic analysis route by default and surfaces structured evidence
+quality, gaps, conflicts, patterns, insights, opportunities, hypotheses,
+uncertainty, and source IDs for human review. Decision Brief views are
+immutable exploratory snapshots, not decisions or recommendations.
+
+For local development, use two terminals:
+
+```bash
+# Terminal 1, repository root
+python3 -m uvicorn src.api.app:app --reload
+
+# Terminal 2
+cd web
+npm install
+npm run dev
+```
+
+Vite serves the UI at `http://localhost:5173` and proxies `/api` to the local
+FastAPI service. This MVP has no accounts, permissions, durable API projects,
+document upload, deployment configuration, or assisted-provider UI. The UI
+does not turn evidence quantity into quality, a brief into ground truth, or
+human review into effectiveness.
+
 OpenSocial AI currently has no external runtime dependencies. Python
 3.12 is used in CI; the optional SQLite store uses Python's built-in
 `sqlite3` module.
