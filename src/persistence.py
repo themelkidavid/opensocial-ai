@@ -173,6 +173,40 @@ class AuditEvent:
         }
 
 
+@dataclass(frozen=True)
+class APIProject:
+    """A durable, application-owned workspace; it is not an identity record."""
+
+    project_id: str
+    name: str
+    description: Optional[str]
+    created_at: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"project_id": self.project_id, "name": self.name, "description": self.description, "created_at": self.created_at}
+
+
+@dataclass(frozen=True)
+class StoredAPIAnalysis:
+    """A persisted API response snapshot, without hidden model reasoning."""
+
+    analysis_id: str
+    project_id: str
+    created_at: str
+    problem: str
+    report: Dict[str, Any]
+    evidence_ids: List[str]
+    narrative_analysis: Optional[Dict[str, Any]]
+    responsible_ai: str
+    interpretation_mode: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"analysis_id": self.analysis_id, "project_id": self.project_id, "created_at": self.created_at, "report": self.report, "evidence_ids": self.evidence_ids, "narrative_analysis": self.narrative_analysis, "responsible_ai": self.responsible_ai}
+
+    def summary_dict(self) -> Dict[str, Any]:
+        return {"analysis_id": self.analysis_id, "project_id": self.project_id, "created_at": self.created_at, "problem": self.problem, "evidence_count": len(self.evidence_ids), "interpretation_mode": self.interpretation_mode}
+
+
 class PersistenceStore:
     """Storage interface used by orchestration without a SQLite dependency."""
 
@@ -1192,6 +1226,76 @@ class SQLiteDecisionBriefRepository:
   row=self._connection.execute("SELECT payload_json FROM decision_briefs WHERE subject_type=? AND subject_id=? ORDER BY brief_version DESC LIMIT 1",(subject_type,subject_id)).fetchone(); return DecisionBrief(**_load_mapping(row["payload_json"])) if row else None
 
 
+class SQLiteAPIWorkspaceRepository:
+    """Application workspace records and links, kept separate from core evidence."""
+
+    def __init__(self, connection, evidence, audit_events):
+        self._connection, self._evidence, self._audit_events = connection, evidence, audit_events
+
+    def save_project(self, project: APIProject) -> APIProject:
+        if not project.project_id or not project.name.strip() or not project.created_at:
+            raise ValueError("project requires an identifier, name, and timestamp")
+        with _write_transaction(self._connection):
+            existing = self.get_project(project.project_id)
+            if existing:
+                if existing != project: raise ValueError("project_id already exists")
+                return existing
+            self._connection.execute("INSERT INTO api_projects (project_id, name, description, created_at) VALUES (?, ?, ?, ?)", (project.project_id, project.name, project.description, project.created_at))
+            self._audit_events._record("project_created", "api_project", project.project_id, "Project workspace was created.", {"project_id": project.project_id})
+        return project
+
+    def get_project(self, project_id):
+        row = self._connection.execute("SELECT project_id, name, description, created_at FROM api_projects WHERE project_id = ?", (project_id,)).fetchone()
+        return APIProject(**dict(row)) if row else None
+
+    def list_projects(self):
+        rows = self._connection.execute("SELECT project_id, name, description, created_at FROM api_projects ORDER BY created_at, project_id").fetchall()
+        return [APIProject(**dict(row)) for row in rows]
+
+    def link_evidence(self, project_id, evidence_id):
+        if not self.get_project(project_id): raise ValueError("unknown project_id")
+        if not self._evidence.get(evidence_id): raise ValueError("unknown evidence_id")
+        with _write_transaction(self._connection):
+            existing = self._connection.execute("SELECT 1 FROM api_project_evidence WHERE project_id = ? AND evidence_id = ?", (project_id, evidence_id)).fetchone()
+            if existing: return
+            position = self._connection.execute("SELECT COUNT(*) AS count FROM api_project_evidence WHERE project_id = ?", (project_id,)).fetchone()["count"]
+            self._connection.execute("INSERT INTO api_project_evidence (project_id, evidence_id, position, created_at) VALUES (?, ?, ?, ?)", (project_id, evidence_id, position, _timestamp()))
+            self._audit_events._record("project_evidence_linked", "api_project", project_id, "Evidence was linked to a project workspace.", {"project_id": project_id, "evidence_id": evidence_id})
+
+    def list_evidence(self, project_id):
+        if not self.get_project(project_id): raise ValueError("unknown project_id")
+        rows = self._connection.execute("SELECT evidence_id FROM api_project_evidence WHERE project_id = ? ORDER BY position, evidence_id", (project_id,)).fetchall()
+        return [self._evidence.get(row["evidence_id"]) for row in rows]
+
+    def save_analysis(self, analysis: StoredAPIAnalysis) -> StoredAPIAnalysis:
+        if not self.get_project(analysis.project_id): raise ValueError("unknown project_id")
+        for evidence_id in analysis.evidence_ids:
+            if not self._connection.execute("SELECT 1 FROM api_project_evidence WHERE project_id = ? AND evidence_id = ?", (analysis.project_id, evidence_id)).fetchone():
+                raise ValueError("analysis evidence is not linked to project")
+        with _write_transaction(self._connection):
+            if self.get_analysis(analysis.analysis_id): raise ValueError("analysis_id already exists")
+            self._connection.execute("INSERT INTO api_analyses (analysis_id, project_id, created_at, problem, report_json, evidence_ids_json, narrative_json, responsible_ai, interpretation_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (analysis.analysis_id, analysis.project_id, analysis.created_at, analysis.problem, _dump_json(analysis.report), _dump_json(analysis.evidence_ids), _dump_json(analysis.narrative_analysis) if analysis.narrative_analysis is not None else None, analysis.responsible_ai, analysis.interpretation_mode))
+            self._audit_events._record("analysis_created", "api_analysis", analysis.analysis_id, "Exploratory analysis snapshot was stored; it is not a decision.", {"project_id": analysis.project_id, "evidence_count": len(analysis.evidence_ids), "interpretation_mode": analysis.interpretation_mode})
+        return analysis
+
+    def get_analysis(self, analysis_id, project_id=None):
+        query, values = "SELECT * FROM api_analyses WHERE analysis_id = ?", [analysis_id]
+        if project_id is not None: query += " AND project_id = ?"; values.append(project_id)
+        row = self._connection.execute(query, values).fetchone()
+        if not row: return None
+        return StoredAPIAnalysis(row["analysis_id"], row["project_id"], row["created_at"], row["problem"], _load_mapping(row["report_json"]), _load_list(row["evidence_ids_json"]), _load_mapping(row["narrative_json"]) if row["narrative_json"] else None, row["responsible_ai"], row["interpretation_mode"])
+
+    def list_analyses(self, project_id):
+        if not self.get_project(project_id): raise ValueError("unknown project_id")
+        rows = self._connection.execute("SELECT analysis_id FROM api_analyses WHERE project_id = ? ORDER BY created_at DESC, analysis_id DESC", (project_id,)).fetchall()
+        return [self.get_analysis(row["analysis_id"], project_id) for row in rows]
+
+    def list_briefs(self, project_id):
+        if not self.get_project(project_id): raise ValueError("unknown project_id")
+        rows = self._connection.execute("SELECT brief_id FROM decision_briefs WHERE subject_type = 'analysis' AND subject_id IN (SELECT analysis_id FROM api_analyses WHERE project_id = ?) ORDER BY brief_id", (project_id,)).fetchall()
+        return [row["brief_id"] for row in rows]
+
+
 class SQLitePersistenceStore(PersistenceStore):
     """Optional SQLite implementation of the persistence-store interface."""
 
@@ -1232,6 +1336,7 @@ class SQLitePersistenceStore(PersistenceStore):
         self.scenarios = SQLiteScenarioRepository(self._connection,self.historical,self.audit_events)
         self.governance = SQLiteGovernanceRepository(self._connection,self.scenarios,self.audit_events)
         self.briefs = SQLiteDecisionBriefRepository(self._connection,self.audit_events)
+        self.api_workspaces = SQLiteAPIWorkspaceRepository(self._connection, self.evidence, self.audit_events)
 
     def save_evidence(
         self,
@@ -1295,6 +1400,15 @@ class SQLitePersistenceStore(PersistenceStore):
     def list_decision_briefs_by_subject(self, subject_type, subject_id): return self.briefs.list_briefs(subject_type,subject_id)
     def list_decision_brief_versions(self, subject_type, subject_id): return self.briefs.list_briefs(subject_type,subject_id)
     def get_latest_decision_brief(self, subject_type, subject_id): return self.briefs.latest(subject_type,subject_id)
+    def save_api_project(self, project): return self.api_workspaces.save_project(project)
+    def get_api_project(self, project_id): return self.api_workspaces.get_project(project_id)
+    def list_api_projects(self): return self.api_workspaces.list_projects()
+    def link_api_project_evidence(self, project_id, evidence_id): return self.api_workspaces.link_evidence(project_id, evidence_id)
+    def list_api_project_evidence(self, project_id): return self.api_workspaces.list_evidence(project_id)
+    def save_api_analysis(self, analysis): return self.api_workspaces.save_analysis(analysis)
+    def get_api_analysis(self, analysis_id, project_id=None): return self.api_workspaces.get_analysis(analysis_id, project_id)
+    def list_api_analyses(self, project_id): return self.api_workspaces.list_analyses(project_id)
+    def list_api_briefs(self, project_id): return self.api_workspaces.list_briefs(project_id)
 
     @contextmanager
     def transaction(self):
@@ -1483,6 +1597,24 @@ class SQLitePersistenceStore(PersistenceStore):
                 CREATE TABLE IF NOT EXISTS experiment_authorizations (authorization_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, scenario_id TEXT NOT NULL, payload_json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS evidence_packs (pack_id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, payload_json TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS decision_briefs (brief_id TEXT PRIMARY KEY, subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, brief_version INTEGER NOT NULL, payload_json TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS api_projects (
+                    project_id TEXT PRIMARY KEY, name TEXT NOT NULL,
+                    description TEXT, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS api_project_evidence (
+                    project_id TEXT NOT NULL, evidence_id TEXT NOT NULL,
+                    position INTEGER NOT NULL, created_at TEXT NOT NULL,
+                    PRIMARY KEY (project_id, evidence_id), UNIQUE (project_id, position),
+                    FOREIGN KEY (project_id) REFERENCES api_projects(project_id),
+                    FOREIGN KEY (evidence_id) REFERENCES evidence_records(evidence_id)
+                );
+                CREATE TABLE IF NOT EXISTS api_analyses (
+                    analysis_id TEXT PRIMARY KEY, project_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL, problem TEXT NOT NULL, report_json TEXT NOT NULL,
+                    evidence_ids_json TEXT NOT NULL, narrative_json TEXT,
+                    responsible_ai TEXT NOT NULL, interpretation_mode TEXT NOT NULL,
+                    FOREIGN KEY (project_id) REFERENCES api_projects(project_id)
+                );
                 """
             )
 

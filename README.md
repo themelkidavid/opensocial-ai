@@ -439,6 +439,24 @@ document upload, deployment configuration, or assisted-provider UI. The UI
 does not turn evidence quantity into quality, a brief into ground truth, or
 human review into effectiveness.
 
+### Durable local API workspaces
+
+The API uses SQLite for durable projects, explicit project-to-evidence links,
+and completed analysis snapshots. Set `OPENSOCIAL_DATABASE_PATH` to a
+server-configured relative path to retain API workspaces across restarts:
+
+```bash
+mkdir -p data
+export OPENSOCIAL_DATABASE_PATH="./data/opensocial.sqlite3"
+python3 -m uvicorn src.api.app:app --reload
+```
+
+Create a project, add evidence, and run an analysis; after restarting with the
+same setting, the project, evidence, analyses, and API-created briefs remain
+available. The default remains in-memory for isolated tests. SQLite is suitable
+for local/internal demonstrations, not a multi-user deployment; authentication
+and a production database are deferred.
+
 OpenSocial AI currently has no external runtime dependencies. Python
 3.12 is used in CI; the optional SQLite store uses Python's built-in
 `sqlite3` module.

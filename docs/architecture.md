@@ -189,6 +189,24 @@ SQLite store. Projects and analysis snapshots are deliberately process-local in
 Phase 1, so they are not a multi-tenant or deployment-ready workspace model.
 The API does not create governance decisions or authorizations from analysis.
 
+### Durable API workspace records
+
+When configured with `OPENSOCIAL_DATABASE_PATH`, the API owns durable
+`api_projects`, `api_project_evidence`, and `api_analyses` records in the same
+SQLite store as evidence. Project membership is an explicit foreign-key link;
+the core `EvidenceItem` model remains independent of application workspaces.
+Analysis snapshots store their returned report, source IDs, optional narrative
+output, responsible-AI statement, and interpretation mode—not hidden model
+reasoning. API-created Evidence Packs and Decision Briefs remain linked through
+their persisted analysis subject IDs after a restart.
+
+An injected store remains owned by its caller; an application-created store is
+closed at FastAPI shutdown. The default in-memory store keeps isolated tests
+independent. SQLite uses one shared connection for local worker threads and
+transactions for linked writes, but it is not a final multi-user or PostgreSQL
+replacement. Authentication, authorization, tenancy, and production database
+operations are deferred to Phase 3B and later.
+
 ## Optional browser interface boundary
 
 `web/` is an optional React, TypeScript, and Vite client for `/api/v1`. A

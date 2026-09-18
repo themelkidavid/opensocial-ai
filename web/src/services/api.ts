@@ -1,4 +1,4 @@
-import type { Analysis, ApiError, Brief, EvidenceInput, EvidenceRecord, Project } from "../types/api";
+import type { Analysis, AnalysisSummary, ApiError, Brief, EvidenceInput, EvidenceRecord, Project } from "../types/api";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
@@ -19,6 +19,8 @@ export class ApiClient {
   addEvidence(id: string, evidence: EvidenceInput) { return this.request<{ evidence_id: string }>(`/projects/${id}/evidence`, { method: "POST", body: JSON.stringify(evidence) }); }
   addBulkEvidence(id: string, records: EvidenceInput[]) { return this.request<{ evidence: { evidence_id: string }[] }>(`/projects/${id}/evidence/bulk`, { method: "POST", body: JSON.stringify({ records }) }); }
   runAnalysis(id: string, problem: string, includeNarrative: boolean) { return this.request<Analysis>(`/projects/${id}/analysis`, { method: "POST", body: JSON.stringify({ problem, include_narrative: includeNarrative, interpretation_mode: "deterministic" }) }); }
+  listAnalyses(id: string) { return this.request<AnalysisSummary[]>(`/projects/${id}/analyses`); }
+  getAnalysis(id: string, analysisId: string) { return this.request<Analysis>(`/projects/${id}/analysis/${analysisId}`); }
   createBrief(id: string, analysisId: string, title: string) { return this.request<{ brief_id: string; version: number; brief: Brief }>(`/projects/${id}/briefs`, { method: "POST", body: JSON.stringify({ analysis_id: analysisId, title }) }); }
   getBrief(id: string, briefId: string) { return this.request<Brief>(`/projects/${id}/briefs/${briefId}`); }
   getBriefMarkdown(id: string, briefId: string) { return fetch(`${baseUrl}/projects/${id}/briefs/${briefId}/markdown`).then((r) => r.text()); }
