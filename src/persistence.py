@@ -32,6 +32,7 @@ try:
     from src.strategic_scenarios import StrategicScenario
     from src.governance import GovernanceReview, DecisionRecord, ExperimentAuthorization
     from src.decision_briefs import EvidencePack, DecisionBrief
+    from src.auth import User, Organisation, Membership, AuthSession, ROLES
 except ModuleNotFoundError:
     from evidence import EvidenceItem, create_evidence
     from experiment_design import ExperimentDesign
@@ -46,6 +47,7 @@ except ModuleNotFoundError:
     from strategic_scenarios import StrategicScenario
     from governance import GovernanceReview, DecisionRecord, ExperimentAuthorization
     from decision_briefs import EvidencePack, DecisionBrief
+    from auth import User, Organisation, Membership, AuthSession, ROLES
 
 
 @dataclass
@@ -1296,6 +1298,34 @@ class SQLiteAPIWorkspaceRepository:
         return [row["brief_id"] for row in rows]
 
 
+class SQLiteAuthRepository:
+    def __init__(self, connection, audit_events): self._connection,self._audit=connection,audit_events
+    def audit(self,*args): self._audit.record(*args)
+    def create_user(self,user):
+        try:
+            with _write_transaction(self._connection): self._connection.execute("INSERT INTO api_users VALUES (?,?,?,?,?,?,?)",(user.user_id,user.email,user.password_hash,user.display_name,int(user.is_active),user.created_at,user.last_login_at)); self._audit._record("user_created","user",user.user_id,"User account was created.",{})
+        except sqlite3.IntegrityError as error: raise ValueError("email already exists") from error
+        return user
+    def _user(self,row): return User(row["user_id"],row["email"],row["password_hash"],row["display_name"],bool(row["is_active"]),row["created_at"],row["last_login_at"])
+    def get_user_by_email(self,email):
+        row=self._connection.execute("SELECT * FROM api_users WHERE email=?",(email,)).fetchone(); return self._user(row) if row else None
+    def get_user(self,user_id):
+        row=self._connection.execute("SELECT * FROM api_users WHERE user_id=?",(user_id,)).fetchone(); return self._user(row) if row else None
+    def update_login(self,user_id): self._connection.execute("UPDATE api_users SET last_login_at=? WHERE user_id=?",(_timestamp(),user_id)); self._connection.commit()
+    def update_password(self,user_id,password_hash): self._connection.execute("UPDATE api_users SET password_hash=? WHERE user_id=?",(password_hash,user_id)); self._connection.commit()
+    def create_organisation(self,value): self._connection.execute("INSERT INTO api_organisations VALUES (?,?,?,?)",(value.organisation_id,value.name,value.description,value.created_at)); self._connection.commit(); return value
+    def get_organisation(self,organisation_id):
+        row=self._connection.execute("SELECT * FROM api_organisations WHERE organisation_id=?",(organisation_id,)).fetchone(); return Organisation(**dict(row)) if row else None
+    def add_membership(self,value):
+        if value.role not in ROLES: raise ValueError("unsupported role")
+        self._connection.execute("INSERT INTO api_memberships VALUES (?,?,?,?)",(value.organisation_id,value.user_id,value.role,value.created_at)); self._connection.commit(); return value
+    def list_memberships(self,organisation_id): return [Membership(**dict(row)) for row in self._connection.execute("SELECT * FROM api_memberships WHERE organisation_id=? ORDER BY user_id",(organisation_id,))]
+    def has_owner(self): return bool(self._connection.execute("SELECT 1 FROM api_memberships WHERE role='owner' LIMIT 1").fetchone())
+    def create_session(self,value): self._connection.execute("INSERT INTO api_sessions VALUES (?,?,?,?,?,?)",(value.session_id,value.user_id,value.token_hash,value.created_at,value.expires_at,value.revoked_at)); self._connection.commit()
+    def resolve_session(self,digest):
+        row=self._connection.execute("SELECT * FROM api_sessions WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?",(digest,_timestamp())).fetchone(); return AuthSession(**dict(row)) if row else None
+    def revoke_session(self,session_id): self._connection.execute("UPDATE api_sessions SET revoked_at=? WHERE session_id=?",(_timestamp(),session_id)); self._connection.commit()
+
 class SQLitePersistenceStore(PersistenceStore):
     """Optional SQLite implementation of the persistence-store interface."""
 
@@ -1337,6 +1367,7 @@ class SQLitePersistenceStore(PersistenceStore):
         self.governance = SQLiteGovernanceRepository(self._connection,self.scenarios,self.audit_events)
         self.briefs = SQLiteDecisionBriefRepository(self._connection,self.audit_events)
         self.api_workspaces = SQLiteAPIWorkspaceRepository(self._connection, self.evidence, self.audit_events)
+        self.auth = SQLiteAuthRepository(self._connection, self.audit_events)
 
     def save_evidence(
         self,
@@ -1615,6 +1646,10 @@ class SQLitePersistenceStore(PersistenceStore):
                     responsible_ai TEXT NOT NULL, interpretation_mode TEXT NOT NULL,
                     FOREIGN KEY (project_id) REFERENCES api_projects(project_id)
                 );
+                CREATE TABLE IF NOT EXISTS api_users (user_id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, display_name TEXT NOT NULL, is_active INTEGER NOT NULL, created_at TEXT NOT NULL, last_login_at TEXT);
+                CREATE TABLE IF NOT EXISTS api_organisations (organisation_id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, created_at TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS api_memberships (organisation_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (organisation_id,user_id), FOREIGN KEY (organisation_id) REFERENCES api_organisations(organisation_id), FOREIGN KEY (user_id) REFERENCES api_users(user_id));
+                CREATE TABLE IF NOT EXISTS api_sessions (session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, revoked_at TEXT, FOREIGN KEY (user_id) REFERENCES api_users(user_id));
                 """
             )
 

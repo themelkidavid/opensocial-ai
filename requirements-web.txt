@@ -3,3 +3,4 @@ fastapi>=0.110,<1
 uvicorn>=0.27,<1
 python-multipart>=0.0.9,<1
 httpx2>=2,<3
+argon2-cffi>=23,<26
